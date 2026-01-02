@@ -1,0 +1,8 @@
+# Streamlit Todo App - Requirements for Streamlit Cloud Deployment
+# Install with: pip install -r requirements.txt
+
+streamlit>=1.28.0
+pandas>=1.5.0
+
+# Optional: For enhanced UI (not required but nice to have)
+# altair>=5.0.0
