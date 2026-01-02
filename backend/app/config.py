@@ -10,8 +10,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    # Database
-    DATABASE_URL: str
+    # Database - defaults to SQLite for local development
+    DATABASE_URL: str = "sqlite:///./todo.db"
 
     # Security
     SECRET_KEY: str

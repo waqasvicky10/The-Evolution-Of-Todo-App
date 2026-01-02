@@ -5,15 +5,10 @@ This module provides secure password hashing using bcrypt and JWT token
 generation/validation for authentication.
 """
 
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from app.config import settings
-
-
-# Password hashing context using bcrypt
-# Cost factor 12 provides strong security while maintaining reasonable performance
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
@@ -31,7 +26,10 @@ def hash_password(password: str) -> str:
         >>> print(len(hashed))  # ~60 characters
         60
     """
-    return pwd_context.hash(password)
+    password_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt(rounds=12)
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -52,7 +50,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         >>> verify_password("WrongPassword", hashed)
         False
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    password_bytes = plain_password.encode('utf-8')
+    hashed_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(password_bytes, hashed_bytes)
 
 
 def create_access_token(user_id: int) -> str:

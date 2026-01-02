@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.routes import auth, tasks
+from app.database import init_db
 
 
 # Create FastAPI application
@@ -16,6 +17,12 @@ app = FastAPI(
     description="Multi-user todo application with authentication",
     version="2.0.0"
 )
+
+
+# Initialize database tables on startup
+@app.on_event("startup")
+def startup_event():
+    init_db()
 
 
 # Configure CORS

@@ -10,10 +10,12 @@ from app.config import settings
 
 
 # Create database engine
+# Support both PostgreSQL and SQLite (for local development without PostgreSQL)
 engine = create_engine(
     settings.DATABASE_URL,
     echo=True if settings.ENVIRONMENT == "development" else False,
     pool_pre_ping=True,  # Verify connections before using
+    connect_args={"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
 )
 
 

@@ -6,6 +6,7 @@ Pydantic models for user registration, login, and token management.
 
 from pydantic import BaseModel, EmailStr, constr, field_validator
 from typing import Optional
+from datetime import datetime
 
 
 class RegisterRequest(BaseModel):
@@ -114,7 +115,7 @@ class UserResponse(BaseModel):
 
     id: int
     email: str
-    created_at: str
+    created_at: str  # ISO format string
 
     class Config:
         from_attributes = True  # Allows creation from SQLModel objects

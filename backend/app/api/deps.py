@@ -34,7 +34,7 @@ def get_db() -> Generator[Session, None, None]:
             items = db.query(Item).all()
             return items
     """
-    return get_session()
+    yield from get_session()
 
 
 def get_current_user(

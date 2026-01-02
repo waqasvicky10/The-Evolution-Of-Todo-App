@@ -18,11 +18,11 @@ from app.models.user import User
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(
     request: RegisterRequest,
     db: Session = Depends(get_db)
-):
+) -> dict:
     """
     Register a new user account.
 
@@ -57,7 +57,12 @@ def register(
         }
     """
     user = create_user(db, email=request.email, password=request.password)
-    return user
+    # Convert datetime to ISO string for response
+    return {
+        "id": user.id,
+        "email": user.email,
+        "created_at": user.created_at.isoformat()
+    }
 
 
 @router.post("/login", response_model=TokenResponse)
