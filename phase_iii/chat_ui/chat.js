@@ -9,13 +9,13 @@
  */
 
 // Configuration
-// Always use localhost API when opened from file:// protocol
+// Use localhost API for local dev, production backend URL for deployed environments
 const API_BASE_URL = (window.location.protocol === 'file:' ||
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1' ||
     !window.location.hostname)
     ? 'http://localhost:8000/api'
-    : '/api';
+    : 'https://the-evolution-of-todo-app-phase-iv-api.vercel.app/api';
 
 // Log API URL for debugging
 console.log('API Base URL:', API_BASE_URL);
