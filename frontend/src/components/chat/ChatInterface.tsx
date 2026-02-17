@@ -1,21 +1,23 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import ChatMessage, { Message } from "./ChatMessage";
 import ChatInput from "./ChatInput";
-import axios from "axios";
 import { useAuth } from "@/contexts/AuthContext";
+import apiClient, { getErrorMessage } from "@/lib/api";
 
 /**
  * ChatInterface component.
  * 
  * Orchestrates the chat experience within the Next.js app.
+ * Uses apiClient for automatic token refresh on 401 and retry logic.
  */
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
+const MAX_RETRIES = 2;
+const CHAT_TIMEOUT = 45000; // 45 seconds for serverless cold starts + agent processing
 
 export default function ChatInterface() {
-    const { user, accessToken } = useAuth();
+    const { user, accessToken, refreshAuth } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -35,22 +37,49 @@ export default function ChatInterface() {
             if (!accessToken) return;
 
             try {
-                const response = await axios.get(`${API_BASE_URL}/api/chat/history`, {
-                    headers: { Authorization: `Bearer ${accessToken}` },
-                    timeout: 30000  // 30 second timeout
+                const response = await apiClient.get("/api/chat/history", {
+                    timeout: CHAT_TIMEOUT,
                 });
                 setMessages(response.data.messages || []);
             } catch (err: any) {
-                // Silently fail - history is optional, 404 is OK for now
                 if (err.response?.status !== 404) {
                     console.error("Failed to load chat history:", err);
                 }
-                // Don't show error for missing history endpoint
             }
         };
 
         loadHistory();
     }, [accessToken]);
+
+    /**
+     * Send a chat message with automatic retry on transient failures.
+     */
+    const sendWithRetry = useCallback(async (content: string, retries = 0): Promise<any> => {
+        try {
+            const response = await apiClient.post(
+                "/api/chat",
+                { message: content },
+                { timeout: CHAT_TIMEOUT }
+            );
+            return response;
+        } catch (err: any) {
+            const status = err.response?.status;
+            const isRetryable =
+                !status ||
+                status === 502 ||
+                status === 503 ||
+                status === 504 ||
+                err.code === "ECONNABORTED" ||
+                err.code === "ERR_NETWORK";
+
+            if (isRetryable && retries < MAX_RETRIES) {
+                const delay = Math.min(1000 * Math.pow(2, retries), 4000);
+                await new Promise((r) => setTimeout(r, delay));
+                return sendWithRetry(content, retries + 1);
+            }
+            throw err;
+        }
+    }, []);
 
     const handleSendMessage = async (content: string) => {
         if (!accessToken) {
@@ -69,11 +98,7 @@ export default function ChatInterface() {
         setError(null);
 
         try {
-            const response = await axios.post(
-                `${API_BASE_URL}/api/chat`,
-                { message: content },
-                { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
+            const response = await sendWithRetry(content);
 
             const assistantMessage: Message = {
                 role: "assistant",
@@ -84,13 +109,26 @@ export default function ChatInterface() {
             setMessages((prev) => [...prev, assistantMessage]);
         } catch (err: any) {
             console.error("Chat error:", err);
-            const errorMessage = err.response?.data?.detail || "Something went wrong. Please try again.";
+            const status = err.response?.status;
+
+            let errorMessage: string;
+            if (status === 401) {
+                errorMessage = "Your session has expired. Please log in again.";
+            } else if (status === 500) {
+                errorMessage = "The server encountered an error. Please try again in a moment.";
+            } else if (err.code === "ECONNABORTED") {
+                errorMessage = "Request timed out. The server may be starting up — please try again.";
+            } else if (err.code === "ERR_NETWORK") {
+                errorMessage = "Network error. Please check your connection and try again.";
+            } else {
+                errorMessage = getErrorMessage(err);
+            }
+
             setError(errorMessage);
 
-            // Add a system message showing the error
             setMessages((prev) => [...prev, {
                 role: "assistant",
-                content: "I'm sorry, I'm having trouble connecting to the backend. Please make sure the Chat API and MCP Server are running.",
+                content: `Sorry, something went wrong: ${errorMessage}`,
                 timestamp: new Date().toISOString(),
             }]);
         } finally {
