@@ -15,7 +15,7 @@ backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
 from app.core.security import create_access_token, verify_token
-from app.core.user_context import get_user_context_from_token, format_user_greeting
+from app.agents.user_context import get_user_context_from_token, format_user_greeting
 
 
 def test_jwt_with_email():

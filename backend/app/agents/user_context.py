@@ -7,7 +7,7 @@ from JWT tokens for chatbot personalization and other features.
 
 from typing import Dict, Optional, Any
 from fastapi.security import HTTPAuthorizationCredentials
-from .security import verify_token
+from app.core.security import verify_token
 
 
 def get_user_context_from_token(token: str) -> Dict[str, Any]:

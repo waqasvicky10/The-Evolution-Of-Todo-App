@@ -16,7 +16,7 @@ project_root = backend_dir.parent.resolve()
 sys.path.insert(0, str(backend_dir))
 sys.path.insert(0, str(project_root))
 
-from app.core.task_parser import extract_task_id
+from app.agents.task_parser import extract_task_id
 
 def test_id_extraction():
     """Test natural language task ID extraction."""

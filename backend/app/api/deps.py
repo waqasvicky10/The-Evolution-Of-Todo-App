@@ -11,7 +11,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.database import get_session
 from app.core.security import verify_token
-from app.core.user_context import get_user_context_from_credentials
+from app.agents.user_context import get_user_context_from_credentials
 from app.models.user import User
 
 

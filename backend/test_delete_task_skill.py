@@ -16,7 +16,7 @@ project_root = backend_dir.parent.resolve()
 sys.path.insert(0, str(backend_dir))
 sys.path.insert(0, str(project_root))
 
-from app.core.task_parser import extract_search_term
+from app.agents.task_parser import extract_search_term
 
 def test_search_term_extraction():
     """Test natural language search term extraction for deletions."""

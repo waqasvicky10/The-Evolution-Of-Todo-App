@@ -20,7 +20,7 @@ sys.path.insert(0, str(project_root))
 
 from phase_iii.agent.agent import TodoAgent
 from phase_iii.agent.providers.openai_provider import OpenAIProvider
-from app.core.agent_prompts import TODO_AGENT_SYSTEM_PROMPT
+from app.agents.agent_prompts import TODO_AGENT_SYSTEM_PROMPT
 
 class TestTodoChatAgent(TracebackTestCase if hasattr(unittest, 'TracebackTestCase') else unittest.TestCase):
     

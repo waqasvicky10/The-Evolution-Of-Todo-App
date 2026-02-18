@@ -19,7 +19,7 @@ sys.path.insert(0, str(project_root))
 
 from phase_iii.agent.agent import TodoAgent
 from phase_iii.agent.providers.openai_provider import OpenAIProvider
-from app.core.agent_prompts import USER_INFO_SUBAGENT_PROMPT
+from app.agents.agent_prompts import USER_INFO_SUBAGENT_PROMPT
 
 class TestUserInfoSubagent(unittest.TestCase):
     

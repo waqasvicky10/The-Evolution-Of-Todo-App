@@ -15,7 +15,7 @@ project_root = backend_dir.parent.resolve()
 sys.path.insert(0, str(backend_dir))
 sys.path.insert(0, str(project_root))
 
-from app.core.task_parser import parse_update_input
+from app.agents.task_parser import parse_update_input
 
 def test_update_parsing():
     """Test natural language update extraction."""

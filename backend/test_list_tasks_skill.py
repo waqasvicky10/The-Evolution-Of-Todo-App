@@ -17,7 +17,7 @@ project_root = backend_dir.parent.resolve()
 sys.path.insert(0, str(backend_dir))
 sys.path.insert(0, str(project_root))
 
-from app.core.task_parser import parse_list_status
+from app.agents.task_parser import parse_list_status
 
 def test_status_parsing():
     """Test natural language status extraction."""

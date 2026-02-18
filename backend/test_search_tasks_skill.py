@@ -17,7 +17,7 @@ project_root = backend_dir.parent.resolve()
 sys.path.insert(0, str(backend_dir))
 sys.path.insert(0, str(project_root))
 
-from app.core.task_parser import parse_search_query
+from app.agents.task_parser import parse_search_query
 
 def test_search_parsing():
     """Test natural language search extraction."""

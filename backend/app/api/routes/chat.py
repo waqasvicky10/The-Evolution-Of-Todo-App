@@ -19,7 +19,7 @@ from app.models.task import Task
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 # Restore Phase III Agent Integration
-from app.agent import create_agent, get_agent_config, get_mcp_tool_definitions
+from app.agents import create_agent, get_agent_config, get_mcp_tool_definitions
 
 PHASE_III_AVAILABLE = True
 PERSISTENCE_AVAILABLE = False
@@ -553,15 +553,15 @@ async def chat(
             msg_lower = f" {message.lower()} " # Pad with spaces for word boundary match
             
             if any(kw in msg_lower for kw in identity_keywords):
-                from app.core.agent_prompts import USER_INFO_SUBAGENT_PROMPT
+                from app.agents.agent_prompts import USER_INFO_SUBAGENT_PROMPT
                 system_prompt = USER_INFO_SUBAGENT_PROMPT
                 print(f"[Chat API] Routing to UserInfoSubagent")
             elif any(kw in msg_lower for kw in context_keywords):
-                from app.core.agent_prompts import CONVERSATION_MANAGER_SUBAGENT_PROMPT
+                from app.agents.agent_prompts import CONVERSATION_MANAGER_SUBAGENT_PROMPT
                 system_prompt = CONVERSATION_MANAGER_SUBAGENT_PROMPT
                 print(f"[Chat API] Routing to ConversationManagerSubagent")
             elif any(kw in msg_lower for kw in task_keywords):
-                from app.core.agent_prompts import TASK_CRUD_SUBAGENT_PROMPT
+                from app.agents.agent_prompts import TASK_CRUD_SUBAGENT_PROMPT
                 system_prompt = TASK_CRUD_SUBAGENT_PROMPT
                 print(f"[Chat API] Routing to TaskCRUDSubagent")
             

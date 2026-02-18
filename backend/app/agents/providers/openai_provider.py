@@ -86,7 +86,7 @@ class OpenAIProvider(LLMProvider):
             messages.append({"role": "system", "content": system_prompt})
         else:
             try:
-                from app.core.agent_prompts import TODO_AGENT_SYSTEM_PROMPT
+                from app.agents.agent_prompts import TODO_AGENT_SYSTEM_PROMPT
                 messages.append({"role": "system", "content": TODO_AGENT_SYSTEM_PROMPT})
             except ImportError:
                 logger.warning("TODO_AGENT_SYSTEM_PROMPT not found in app.core.agent_prompts. Using default.")
