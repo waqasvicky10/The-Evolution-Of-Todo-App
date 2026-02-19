@@ -1,12 +1,15 @@
 """
-Task database model.
+Task database model — Phase V.
 
 Defines the Task entity with SQLModel for database operations.
+Supports advanced features: due dates, recurring tasks, reminders,
+priorities, tags, and AI-enhanced fields.
 """
 
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING, List
+from typing import Optional, TYPE_CHECKING
+import json
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -17,23 +20,8 @@ class Task(SQLModel, table=True):
     Task model representing todo items in the system.
 
     Each task belongs to exactly one user (user_id foreign key).
-
-    Attributes:
-        id: Auto-incrementing primary key
-        description: Task description (1-500 characters)
-        is_complete: Task completion status (defaults to False)
-        user_id: Foreign key to users table (indexed)
-        created_at: Timestamp when task was created
-        updated_at: Timestamp when task was last updated
-        
-        # AI-enhanced fields
-        category: AI-determined task category
-        priority: AI-determined priority level
-        estimated_duration: AI-estimated completion time
-        ai_tags: AI-generated tags for organization
-        ai_suggestions: AI suggestions for task improvement
-        
-        user: Relationship to the task's owner
+    Phase V adds due dates, recurring schedules, reminders,
+    searchable tags, and priority levels.
     """
 
     __tablename__ = "tasks"
@@ -45,16 +33,43 @@ class Task(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # AI-enhanced fields
+    # Phase V — Advanced fields
+    priority: Optional[str] = Field(default="medium", max_length=20, index=True)
+    tags: Optional[str] = Field(default=None, max_length=500)
+    due_date: Optional[datetime] = Field(default=None, index=True)
+    reminder_at: Optional[datetime] = Field(default=None)
+    recurring_pattern: Optional[str] = Field(default=None, max_length=50)
+
+    # AI-enhanced fields (carried forward from Phase IV)
     category: Optional[str] = Field(default=None, max_length=50)
-    priority: Optional[str] = Field(default=None, max_length=20)  # high, medium, low
     estimated_duration: Optional[str] = Field(default=None, max_length=50)
-    ai_tags: Optional[str] = Field(default=None, max_length=500)  # JSON string of tags
-    ai_suggestions: Optional[str] = Field(default=None, max_length=1000)  # JSON string of suggestions
+    ai_tags: Optional[str] = Field(default=None, max_length=500)
+    ai_suggestions: Optional[str] = Field(default=None, max_length=1000)
 
     # Relationship to user
     user: "User" = Relationship(back_populates="tasks")
 
+    @property
+    def tags_list(self) -> list[str]:
+        """Deserialise the JSON tags string into a Python list."""
+        if not self.tags:
+            return []
+        try:
+            return json.loads(self.tags)
+        except (json.JSONDecodeError, TypeError):
+            return [t.strip() for t in self.tags.split(",") if t.strip()]
+
+    @tags_list.setter
+    def tags_list(self, value: list[str]) -> None:
+        self.tags = json.dumps(value) if value else None
+
+    @property
+    def is_overdue(self) -> bool:
+        return (
+            self.due_date is not None
+            and not self.is_complete
+            and self.due_date < datetime.utcnow()
+        )
+
     def __repr__(self) -> str:
-        """String representation of Task."""
-        return f"<Task(id={self.id}, user_id={self.user_id}, complete={self.is_complete})>"
+        return f"<Task(id={self.id}, user_id={self.user_id}, priority={self.priority}, complete={self.is_complete})>"

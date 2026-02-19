@@ -1,205 +1,213 @@
 
 """
-Task service for CRUD operations with user isolation.
+Task service for CRUD operations with user isolation — Phase V.
 
-This module provides business logic for task management operations.
-All operations enforce user data isolation - users can only access their own tasks.
+Supports advanced features: priority, tags, due dates, recurring tasks,
+reminders, full-text search, filtering, and sorting.
 """
-from typing import Optional
-from sqlmodel import Session, select
-from fastapi import HTTPException, status
+
+import json
+import logging
+from typing import Optional, List, Dict, Any
 from datetime import datetime
-from typing import List
+
+from sqlmodel import Session, select, col
+from fastapi import HTTPException, status
+
 from app.models.task import Task
 
+logger = logging.getLogger(__name__)
 
-def get_user_tasks(db: Session, user_id: int, completed: Optional[bool] = None, priority: Optional[str] = None, category: Optional[str] = None) -> List[Task]:
-    """
-    Get tasks for a specific user with optional filters.
 
-    Args:
-        db: Database session
-        user_id: User ID to filter tasks
-        completed: Filter by completion status
-        priority: Filter by priority level
-        category: Filter by category
+# ---------------------------------------------------------------------------
+# Read
+# ---------------------------------------------------------------------------
 
-    Returns:
-        List of tasks belonging to the user matching filters
-    """
+def get_user_tasks(
+    db: Session,
+    user_id: int,
+    completed: Optional[bool] = None,
+    priority: Optional[str] = None,
+    category: Optional[str] = None,
+) -> List[Task]:
+    """Get tasks for a user with basic filters (backward-compatible)."""
     statement = select(Task).where(Task.user_id == user_id)
-    
     if completed is not None:
         statement = statement.where(Task.is_complete == completed)
     if priority:
         statement = statement.where(Task.priority == priority)
     if category:
         statement = statement.where(Task.category == category)
-        
-    tasks = db.exec(statement).all()
-    return list(tasks)
+    return list(db.exec(statement).all())
 
 
-def create_task(db: Session, user_id: int, description: str) -> Task:
-    """
-    Create a new task for a user.
+def search_tasks(
+    db: Session,
+    user_id: int,
+    *,
+    q: Optional[str] = None,
+    priority: Optional[str] = None,
+    is_complete: Optional[bool] = None,
+    tag: Optional[str] = None,
+    due_before: Optional[datetime] = None,
+    due_after: Optional[datetime] = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+) -> List[Task]:
+    """Advanced search/filter/sort for Phase V."""
+    statement = select(Task).where(Task.user_id == user_id)
 
-    Args:
-        db: Database session
-        user_id: User ID (task owner)
-        description: Task description
+    if q:
+        statement = statement.where(col(Task.description).ilike(f"%{q}%"))
+    if priority:
+        statement = statement.where(Task.priority == priority)
+    if is_complete is not None:
+        statement = statement.where(Task.is_complete == is_complete)
+    if tag:
+        statement = statement.where(col(Task.tags).ilike(f"%{tag}%"))
+    if due_before:
+        statement = statement.where(Task.due_date <= due_before)
+    if due_after:
+        statement = statement.where(Task.due_date >= due_after)
 
-    Returns:
-        Created task object
+    allowed_sort = {"created_at", "updated_at", "due_date", "priority"}
+    sort_field = sort_by if sort_by in allowed_sort else "created_at"
+    column = getattr(Task, sort_field)
+    statement = statement.order_by(column.desc() if sort_order == "desc" else column.asc())
 
-    Example:
-        >>> task = create_task(db, user_id=1, description="Buy groceries")
-        >>> print(task.id)
-        1
-        >>> print(task.user_id)
-        1
-    """
-    task = Task(description=description, user_id=user_id)
-    db.add(task)
-    db.commit()
-    db.refresh(task)
-    return task
+    return list(db.exec(statement).all())
 
 
 def get_task_by_id(db: Session, task_id: int, user_id: int) -> Task:
-    """
-    Get a specific task by ID with user isolation check.
-
-    CRITICAL: This function enforces user data isolation.
-    Query filters by BOTH task_id AND user_id to ensure users can only
-    access their own tasks.
-
-    Args:
-        db: Database session
-        task_id: Task ID
-        user_id: User ID (must be task owner)
-
-    Returns:
-        Task object if found and belongs to user
-
-    Raises:
-        HTTPException 404: If task not found OR belongs to different user
-                           (same error for security - don't leak task existence)
-
-    Example:
-        >>> task = get_task_by_id(db, task_id=1, user_id=1)
-        >>> print(task.description)
-        Buy groceries
-
-        >>> # User 2 trying to access User 1's task
-        >>> task = get_task_by_id(db, task_id=1, user_id=2)
-        HTTPException: 404 Task not found
-    """
+    """Get a specific task by ID with user isolation."""
     task = db.exec(
         select(Task).where(Task.id == task_id, Task.user_id == user_id)
     ).first()
-
     if not task:
-        # Return 404 whether task doesn't exist OR belongs to different user
-        # Don't reveal if task exists (security best practice)
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     return task
 
 
-def update_task(db: Session, task_id: int, user_id: int, description: str) -> Task:
-    """
-    Update a task's description with user isolation check.
+def get_overdue_tasks(db: Session, user_id: int) -> List[Task]:
+    """Return incomplete tasks past their due date."""
+    now = datetime.utcnow()
+    statement = (
+        select(Task)
+        .where(Task.user_id == user_id, Task.is_complete == False, Task.due_date < now)  # noqa: E712
+        .order_by(Task.due_date.asc())
+    )
+    return list(db.exec(statement).all())
 
-    Args:
-        db: Database session
-        task_id: Task ID
-        user_id: User ID (must be task owner)
-        description: New task description
 
-    Returns:
-        Updated task object
+def get_due_reminders(db: Session) -> List[Task]:
+    """Return tasks whose reminder_at is in the past and are not yet complete."""
+    now = datetime.utcnow()
+    statement = (
+        select(Task)
+        .where(Task.is_complete == False, Task.reminder_at <= now)  # noqa: E712
+    )
+    return list(db.exec(statement).all())
 
-    Raises:
-        HTTPException 404: If task not found or belongs to different user
 
-    Example:
-        >>> task = update_task(db, task_id=1, user_id=1, description="Buy groceries and cook")
-        >>> print(task.description)
-        Buy groceries and cook
-    """
-    # get_task_by_id enforces user isolation
+# ---------------------------------------------------------------------------
+# Create
+# ---------------------------------------------------------------------------
+
+def create_task(
+    db: Session,
+    user_id: int,
+    description: str,
+    *,
+    priority: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    due_date: Optional[datetime] = None,
+    reminder_at: Optional[datetime] = None,
+    recurring_pattern: Optional[str] = None,
+) -> Task:
+    """Create a new task with Phase V advanced fields."""
+    task = Task(
+        description=description,
+        user_id=user_id,
+        priority=priority or "medium",
+        tags=json.dumps(tags) if tags else None,
+        due_date=due_date,
+        reminder_at=reminder_at,
+        recurring_pattern=recurring_pattern,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    logger.info("Task %s created for user %s", task.id, user_id)
+    return task
+
+
+# ---------------------------------------------------------------------------
+# Update
+# ---------------------------------------------------------------------------
+
+def update_task(
+    db: Session,
+    task_id: int,
+    user_id: int,
+    description: Optional[str] = None,
+    is_complete: Optional[bool] = None,
+    priority: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    due_date: Optional[datetime] = None,
+    reminder_at: Optional[datetime] = None,
+    recurring_pattern: Optional[str] = None,
+) -> Task:
+    """Partial update supporting all Phase V fields."""
     task = get_task_by_id(db, task_id, user_id)
 
-    # Update task
-    task.description = description
+    if description is not None:
+        task.description = description
+    if is_complete is not None:
+        task.is_complete = is_complete
+    if priority is not None:
+        task.priority = priority
+    if tags is not None:
+        task.tags = json.dumps(tags)
+    if due_date is not None:
+        task.due_date = due_date
+    if reminder_at is not None:
+        task.reminder_at = reminder_at
+    if recurring_pattern is not None:
+        task.recurring_pattern = recurring_pattern
+
     task.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(task)
-
+    logger.info("Task %s updated for user %s", task.id, user_id)
     return task
 
 
-def delete_task(db: Session, task_id: int, user_id: int) -> None:
-    """
-    Delete a task with user isolation check.
-
-    Args:
-        db: Database session
-        task_id: Task ID
-        user_id: User ID (must be task owner)
-
-    Returns:
-        None
-
-    Raises:
-        HTTPException 404: If task not found or belongs to different user
-
-    Example:
-        >>> delete_task(db, task_id=1, user_id=1)
-        # Task deleted successfully
-    """
-    # get_task_by_id enforces user isolation
-    task = get_task_by_id(db, task_id, user_id)
-
-    # Delete task
-    db.delete(task)
-    db.commit()
-
-
 def toggle_task(db: Session, task_id: int, user_id: int) -> Task:
-    """
-    Toggle a task's completion status with user isolation check.
-
-    Args:
-        db: Database session
-        task_id: Task ID
-        user_id: User ID (must be task owner)
-
-    Returns:
-        Updated task object with toggled is_complete status
-
-    Raises:
-        HTTPException 404: If task not found or belongs to different user
-
-    Example:
-        >>> task = toggle_task(db, task_id=1, user_id=1)
-        >>> print(task.is_complete)
-        True
-        >>> task = toggle_task(db, task_id=1, user_id=1)
-        >>> print(task.is_complete)
-        False
-    """
-    # get_task_by_id enforces user isolation
+    """Toggle a task's completion status."""
     task = get_task_by_id(db, task_id, user_id)
-
-    # Toggle completion status
     task.is_complete = not task.is_complete
     task.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(task)
-
     return task
+
+
+# ---------------------------------------------------------------------------
+# Delete
+# ---------------------------------------------------------------------------
+
+def delete_task(db: Session, task_id: int, user_id: int) -> None:
+    """Delete a task with user isolation."""
+    task = get_task_by_id(db, task_id, user_id)
+    db.delete(task)
+    db.commit()
+    logger.info("Task %s deleted for user %s", task_id, user_id)
+
+
+# ---------------------------------------------------------------------------
+# Helpers (used by chat agent)
+# ---------------------------------------------------------------------------
+
+def get_task(db: Session, task_id: int) -> Optional[Task]:
+    """Get task by ID without user isolation (internal use only)."""
+    return db.exec(select(Task).where(Task.id == task_id)).first()

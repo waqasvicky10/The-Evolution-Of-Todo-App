@@ -1,14 +1,39 @@
 """
-Task management API routes.
+Task management API routes — Phase V.
 
-This module provides endpoints for task CRUD operations.
-All endpoints require authentication and enforce user data isolation.
+Endpoints for task CRUD with advanced search/filter/sort, priority,
+tags, due dates, recurring tasks, and reminders.
 """
 
-from fastapi import APIRouter, Depends, status
+from typing import Optional
+from datetime import datetime
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from sqlmodel import Session
-from app.schemas.task import TaskCreate, TaskUpdate, TaskListResponse, TaskResponse
-from app.services.task_service import create_task, get_task_by_id, get_user_tasks, update_task, delete_task, toggle_task
+
+from app.schemas.task import (
+    TaskCreate,
+    TaskUpdate,
+    TaskListResponse,
+    TaskResponse,
+    PriorityEnum,
+)
+from app.services.task_service import (
+    create_task,
+    get_task_by_id,
+    get_user_tasks,
+    search_tasks,
+    update_task,
+    delete_task,
+    toggle_task,
+    get_overdue_tasks,
+)
+from app.services.event_service import (
+    emit_task_created,
+    emit_task_updated,
+    emit_task_deleted,
+    emit_task_completed,
+)
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
 
@@ -16,10 +41,29 @@ from app.models.user import User
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 
+def _task_to_response(task) -> TaskResponse:
+    """Convert a Task model to a TaskResponse, deserialising JSON tags."""
+    data = {
+        "id": task.id,
+        "description": task.description,
+        "is_complete": task.is_complete,
+        "user_id": task.user_id,
+        "priority": task.priority,
+        "tags": task.tags_list,
+        "due_date": task.due_date,
+        "reminder_at": task.reminder_at,
+        "recurring_pattern": task.recurring_pattern,
+        "category": task.category,
+        "created_at": task.created_at,
+        "updated_at": task.updated_at,
+    }
+    return TaskResponse(**data)
+
+
 @router.get("", response_model=TaskListResponse)
 def list_tasks(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get all tasks for the authenticated user.
@@ -60,243 +104,137 @@ def list_tasks(
     """
     tasks = get_user_tasks(db, user_id=current_user.id)
     return TaskListResponse(
-        tasks=[TaskResponse.model_validate(task) for task in tasks],
-        total=len(tasks)
+        tasks=[_task_to_response(t) for t in tasks],
+        total=len(tasks),
+    )
+
+
+@router.get("/search", response_model=TaskListResponse)
+def search_tasks_endpoint(
+    q: Optional[str] = Query(None, description="Full-text keyword search"),
+    priority: Optional[PriorityEnum] = Query(None),
+    is_complete: Optional[bool] = Query(None),
+    tag: Optional[str] = Query(None, description="Filter by tag substring"),
+    due_before: Optional[datetime] = Query(None),
+    due_after: Optional[datetime] = Query(None),
+    sort_by: str = Query("created_at", description="Sort field"),
+    sort_order: str = Query("desc", description="asc or desc"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Phase V: Search, filter, and sort tasks."""
+    tasks = search_tasks(
+        db,
+        user_id=current_user.id,
+        q=q,
+        priority=priority.value if priority else None,
+        is_complete=is_complete,
+        tag=tag,
+        due_before=due_before,
+        due_after=due_after,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+    return TaskListResponse(
+        tasks=[_task_to_response(t) for t in tasks],
+        total=len(tasks),
+    )
+
+
+@router.get("/overdue", response_model=TaskListResponse)
+def overdue_tasks_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Phase V: Get overdue tasks (past due_date, not complete)."""
+    tasks = get_overdue_tasks(db, user_id=current_user.id)
+    return TaskListResponse(
+        tasks=[_task_to_response(t) for t in tasks],
+        total=len(tasks),
     )
 
 
 @router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
-def create_task_endpoint(
+async def create_task_endpoint(
     request: TaskCreate,
+    bg: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Create a new task for the authenticated user.
-
-    Creates a task with the provided description. The task is automatically
-    associated with the authenticated user and starts in incomplete state.
-
-    Args:
-        request: Task creation request with description
-        current_user: Authenticated user from JWT token
-        db: Database session
-
-    Returns:
-        Created task object with timestamps
-
-    Requires:
-        Valid JWT token in Authorization header
-
-    Raises:
-        401: Not authenticated or invalid token
-        422: Validation error (empty description, too long, etc.)
-
-    Example:
-        POST /api/tasks
-        Headers: Authorization: Bearer <access_token>
-        {
-            "description": "Buy groceries"
-        }
-
-        Response 201:
-        {
-            "id": 1,
-            "description": "Buy groceries",
-            "is_complete": false,
-            "user_id": 1,
-            "created_at": "2026-01-01T12:00:00Z",
-            "updated_at": "2026-01-01T12:00:00Z"
-        }
-    """
-    task = create_task(db, user_id=current_user.id, description=request.description)
-    return TaskResponse.model_validate(task)
+    """Create a new task with Phase V advanced fields."""
+    task = create_task(
+        db,
+        user_id=current_user.id,
+        description=request.description,
+        priority=request.priority.value if request.priority else "medium",
+        tags=request.tags,
+        due_date=request.due_date,
+        reminder_at=request.reminder_at,
+        recurring_pattern=request.recurring_pattern.value if request.recurring_pattern else None,
+    )
+    bg.add_task(emit_task_created, task.id, current_user.id, task.description)
+    return _task_to_response(task)
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
 def get_task_endpoint(
     task_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Get a specific task by ID.
-
-    Returns a single task if it exists and belongs to the authenticated user.
-    Enforces user data isolation - users cannot access other users' tasks.
-
-    Args:
-        task_id: Task ID from URL path
-        current_user: Authenticated user from JWT token
-        db: Database session
-
-    Returns:
-        Task object with all details
-
-    Requires:
-        Valid JWT token in Authorization header
-
-    Raises:
-        401: Not authenticated or invalid token
-        404: Task not found OR task belongs to different user
-             (same error for security - don't leak task existence)
-
-    Example:
-        GET /api/tasks/1
-        Headers: Authorization: Bearer <access_token>
-
-        Response 200:
-        {
-            "id": 1,
-            "description": "Buy groceries",
-            "is_complete": false,
-            "user_id": 1,
-            "created_at": "2026-01-01T12:00:00Z",
-            "updated_at": "2026-01-01T12:00:00Z"
-        }
-    """
+    """Get a specific task by ID."""
     task = get_task_by_id(db, task_id=task_id, user_id=current_user.id)
-    return TaskResponse.model_validate(task)
+    return _task_to_response(task)
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
-def update_task_endpoint(
+async def update_task_endpoint(
     task_id: int,
     request: TaskUpdate,
+    bg: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Update a task's description.
-
-    Updates the description of an existing task. Only the task owner can
-    update it. The updated_at timestamp is automatically updated.
-
-    Args:
-        task_id: Task ID from URL path
-        request: Task update request with new description
-        current_user: Authenticated user from JWT token
-        db: Database session
-
-    Returns:
-        Updated task object
-
-    Requires:
-        Valid JWT token in Authorization header
-
-    Raises:
-        401: Not authenticated or invalid token
-        404: Task not found OR task belongs to different user
-        422: Validation error (empty description, too long, etc.)
-
-    Example:
-        PUT /api/tasks/1
-        Headers: Authorization: Bearer <access_token>
-        {
-            "description": "Buy groceries and cook dinner"
-        }
-
-        Response 200:
-        {
-            "id": 1,
-            "description": "Buy groceries and cook dinner",
-            "is_complete": false,
-            "user_id": 1,
-            "created_at": "2026-01-01T12:00:00Z",
-            "updated_at": "2026-01-01T13:00:00Z"
-        }
-    """
-    task = update_task(db, task_id=task_id, user_id=current_user.id, description=request.description)
-    return TaskResponse.model_validate(task)
+    """Phase V: Partial update supporting all advanced fields."""
+    task = update_task(
+        db,
+        task_id=task_id,
+        user_id=current_user.id,
+        description=request.description,
+        is_complete=request.is_complete,
+        priority=request.priority.value if request.priority else None,
+        tags=request.tags,
+        due_date=request.due_date,
+        reminder_at=request.reminder_at,
+        recurring_pattern=request.recurring_pattern.value if request.recurring_pattern else None,
+    )
+    bg.add_task(emit_task_updated, task.id, current_user.id, {"updated": True})
+    return _task_to_response(task)
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task_endpoint(
+async def delete_task_endpoint(
     task_id: int,
+    bg: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Delete a task.
-
-    Permanently deletes a task. Only the task owner can delete it.
-    This operation cannot be undone.
-
-    Args:
-        task_id: Task ID from URL path
-        current_user: Authenticated user from JWT token
-        db: Database session
-
-    Returns:
-        No content (204 status code)
-
-    Requires:
-        Valid JWT token in Authorization header
-
-    Raises:
-        401: Not authenticated or invalid token
-        404: Task not found OR task belongs to different user
-
-    Example:
-        DELETE /api/tasks/1
-        Headers: Authorization: Bearer <access_token>
-
-        Response 204: (No content)
-    """
+    """Delete a task permanently."""
     delete_task(db, task_id=task_id, user_id=current_user.id)
+    bg.add_task(emit_task_deleted, task_id, current_user.id)
 
 
 @router.patch("/{task_id}/toggle", response_model=TaskResponse)
-def toggle_task_endpoint(
+async def toggle_task_endpoint(
     task_id: int,
+    bg: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Toggle a task's completion status.
-
-    Toggles the is_complete status of a task between true and false.
-    If the task is incomplete, it becomes complete. If complete, it becomes incomplete.
-    Only the task owner can toggle it. The updated_at timestamp is automatically updated.
-
-    Args:
-        task_id: Task ID from URL path
-        current_user: Authenticated user from JWT token
-        db: Database session
-
-    Returns:
-        Updated task object with toggled is_complete status
-
-    Requires:
-        Valid JWT token in Authorization header
-
-    Raises:
-        401: Not authenticated or invalid token
-        404: Task not found OR task belongs to different user
-
-    Example:
-        PATCH /api/tasks/1/toggle
-        Headers: Authorization: Bearer <access_token>
-
-        Response 200 (if task was incomplete):
-        {
-            "id": 1,
-            "description": "Buy groceries",
-            "is_complete": true,
-            "user_id": 1,
-            "created_at": "2026-01-01T12:00:00Z",
-            "updated_at": "2026-01-01T14:00:00Z"
-        }
-
-        Response 200 (if task was complete):
-        {
-            "id": 1,
-            "description": "Buy groceries",
-            "is_complete": false,
-            "user_id": 1,
-            "created_at": "2026-01-01T12:00:00Z",
-            "updated_at": "2026-01-01T15:00:00Z"
-        }
-    """
+    """Toggle a task's completion status."""
     task = toggle_task(db, task_id=task_id, user_id=current_user.id)
-    return TaskResponse.model_validate(task)
+    if task.is_complete:
+        bg.add_task(emit_task_completed, task.id, current_user.id)
+    else:
+        bg.add_task(emit_task_updated, task.id, current_user.id, {"is_complete": False})
+    return _task_to_response(task)

@@ -1,0 +1,51 @@
+{{- if .Values.backend.dapr.enabled }}
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: task-pubsub
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    - name: brokers
+      value: "{{ .Release.Name }}-redpanda:9092"
+    - name: consumerGroup
+      value: "todo-app-group"
+    - name: authType
+      value: "none"
+  scopes:
+    - todo-backend
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: task-statestore
+spec:
+  type: state.postgresql
+  version: v1
+  metadata:
+    - name: connectionString
+      secretKeyRef:
+        name: db-secret
+        key: connection-string
+  auth:
+    secretStore: kubernetes
+  scopes:
+    - todo-backend
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: reminder-cron
+spec:
+  type: bindings.cron
+  version: v1
+  metadata:
+    - name: schedule
+      value: "@every 5m"
+    - name: direction
+      value: "input"
+  scopes:
+    - todo-backend
+{{- end }}

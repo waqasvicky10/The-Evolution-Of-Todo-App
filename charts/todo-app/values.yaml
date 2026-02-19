@@ -1,0 +1,80 @@
+# ---------- Global ----------
+global:
+  imageRegistry: ""
+
+# ---------- Backend ----------
+backend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/waqasvicky10/todo-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  env:
+    MOCK_MODE: "true"
+    AI_MODEL: "openai"
+    DAPR_HTTP_PORT: "3500"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  dapr:
+    enabled: true
+    appId: todo-backend
+    appPort: 8000
+    httpPort: 3500
+
+# ---------- Frontend ----------
+frontend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/waqasvicky10/todo-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  env:
+    NEXT_PUBLIC_API_BASE_URL: "http://todo-backend:8000"
+    API_URL: "http://todo-backend:8000"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ---------- Redpanda (local) ----------
+redpanda:
+  enabled: true
+  storage:
+    persistentVolume:
+      size: 2Gi
+
+# ---------- Ingress ----------
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: todo.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: backend
+          port: 8000
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 3000
+
+# ---------- Secrets (referenced by Dapr) ----------
+secrets:
+  dbConnectionString: ""
+  secretKey: ""
+  openaiApiKey: "mock"

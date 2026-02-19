@@ -3,5 +3,5 @@ kind: Namespace
 metadata:
   name: todo-app
   labels:
-    name: todo-app
-    app: todo-chatbot
+    app: todo-app
+    phase: "v"

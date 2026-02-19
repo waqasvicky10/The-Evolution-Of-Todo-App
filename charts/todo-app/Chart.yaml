@@ -1,0 +1,11 @@
+apiVersion: v2
+name: todo-app
+description: Phase V — Event-driven Todo App with Dapr & Redpanda
+type: application
+version: 5.0.0
+appVersion: "5.0.0"
+dependencies:
+  - name: redpanda
+    version: "5.x.x"
+    repository: https://charts.redpanda.com
+    condition: redpanda.enabled
