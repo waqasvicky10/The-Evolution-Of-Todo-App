@@ -39,3 +39,6 @@ Thumbs.db
 *.log
 
 .vercel
+
+# GitHub workflows (requires workflow scope token to push)
+.github/
