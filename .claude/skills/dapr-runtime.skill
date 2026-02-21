@@ -1,0 +1,7 @@
+# Skill: DaprRuntime
+Description: Configure Dapr building blocks for distributed runtime.
+Tool: DaprAgent.full_setup(target="k8s")
+Purpose: Abstract infrastructure (pubsub, state, cron, secrets, invoke) behind Dapr HTTP API.
+Usage: POST /api/dapr/full-setup
+Components: pubsub.kafka (task-pubsub), state.postgresql (task-statestore), bindings.cron (reminder-cron), secretstores.kubernetes, secretstores.local.file.
+Fallback: In-memory state, direct HTTP, env vars when Dapr sidecar unavailable.

@@ -1,5 +1,6 @@
 {{- if .Values.backend.dapr.enabled }}
 ---
+# Pub/Sub — Redpanda (Kafka-compatible)
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
@@ -17,6 +18,7 @@ spec:
   scopes:
     - todo-backend
 ---
+# State Store — Neon PostgreSQL
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
@@ -29,11 +31,16 @@ spec:
       secretKeyRef:
         name: db-secret
         key: connection-string
+    - name: tableName
+      value: "dapr_state"
+    - name: metadataTableName
+      value: "dapr_metadata"
   auth:
     secretStore: kubernetes
   scopes:
     - todo-backend
 ---
+# Input Binding — Cron for reminders
 apiVersion: dapr.io/v1alpha1
 kind: Component
 metadata:
@@ -48,4 +55,14 @@ spec:
       value: "input"
   scopes:
     - todo-backend
+---
+# Secret Store — Kubernetes Secrets
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kubernetes
+spec:
+  type: secretstores.kubernetes
+  version: v1
+  metadata: []
 {{- end }}

@@ -208,7 +208,10 @@ async def update_task_endpoint(
         reminder_at=request.reminder_at,
         recurring_pattern=request.recurring_pattern.value if request.recurring_pattern else None,
     )
-    bg.add_task(emit_task_updated, task.id, current_user.id, {"updated": True})
+    if request.is_complete and task.is_complete and task.recurring_pattern:
+        bg.add_task(emit_task_completed, task.id, current_user.id, task.recurring_pattern)
+    else:
+        bg.add_task(emit_task_updated, task.id, current_user.id, {"updated": True})
     return _task_to_response(task)
 
 
@@ -234,7 +237,7 @@ async def toggle_task_endpoint(
     """Toggle a task's completion status."""
     task = toggle_task(db, task_id=task_id, user_id=current_user.id)
     if task.is_complete:
-        bg.add_task(emit_task_completed, task.id, current_user.id)
+        bg.add_task(emit_task_completed, task.id, current_user.id, task.recurring_pattern)
     else:
         bg.add_task(emit_task_updated, task.id, current_user.id, {"is_complete": False})
     return _task_to_response(task)

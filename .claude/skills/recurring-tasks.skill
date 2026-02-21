@@ -1,0 +1,7 @@
+# Skill: RecurringTasks
+Description: Manage recurring tasks (daily/weekly/monthly auto-reschedule on completion).
+Tool: create_todo(user_id, title, recurring_pattern="weekly")
+Purpose: Auto-create next task instance when a recurring task is completed.
+Usage: "Add task weekly standup repeat weekly" -> create_todo(title="Weekly standup", recurring_pattern="weekly").
+Flow: complete task -> emit_task_completed(recurring_pattern) -> Kafka "recurring-tasks" topic -> RecurringTaskConsumer -> new task with next due_date.
+Patterns: daily (+1 day), weekly (+7 days), monthly (+30 days).

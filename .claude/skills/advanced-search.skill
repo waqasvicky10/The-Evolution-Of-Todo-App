@@ -1,0 +1,8 @@
+# Skill: AdvancedSearch
+Description: Search, filter, and sort tasks using multiple criteria.
+Tool: search_todos(user_id, q="deploy", priority="high", tag="work", sort_by="due_date")
+Purpose: Find specific tasks among many using keyword, priority, tag, date range, and sorting.
+Usage: "Search for urgent work tasks" -> search_todos(priority="urgent", tag="work").
+Endpoint: GET /api/tasks/search
+Filters: q (keyword ILIKE), priority (exact), is_complete (bool), tag (ILIKE), due_before, due_after.
+Sort fields: created_at, updated_at, due_date, priority. Orders: asc, desc.

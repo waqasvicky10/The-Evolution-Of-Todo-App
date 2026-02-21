@@ -14,6 +14,12 @@ spec:
     metadata:
       labels:
         {{- include "todo-app.frontend.selectorLabels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.frontend.dapr.enabled }}
+        dapr.io/enabled: "true"
+        dapr.io/app-id: {{ .Values.frontend.dapr.appId | quote }}
+        dapr.io/app-port: {{ .Values.frontend.dapr.appPort | quote }}
+        {{- end }}
     spec:
       containers:
         - name: frontend

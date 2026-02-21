@@ -65,7 +65,7 @@ export interface RefreshTokenRequest {
 // ============================================================================
 
 /**
- * Task object returned from API.
+ * Task object returned from API — Phase V.
  */
 export interface Task {
   id: number;
@@ -74,32 +74,48 @@ export interface Task {
   user_id: number;
   created_at: string;
   updated_at: string;
-  
+
+  // Phase V advanced fields
+  priority?: string;
+  tags?: string[];
+  due_date?: string | null;
+  reminder_at?: string | null;
+  recurring_pattern?: string | null;
+
   // AI-enhanced fields
   category?: string;
-  priority?: string;
-  estimated_duration?: string;
-  ai_tags?: string; // JSON string of tags array
-  ai_suggestions?: string; // JSON string of suggestions array
-}
-
-/**
- * Task creation request.
- */
-export interface TaskCreate {
-  description: string;
-  category?: string;
-  priority?: string;
   estimated_duration?: string;
   ai_tags?: string;
   ai_suggestions?: string;
 }
 
 /**
- * Task update request.
+ * Task creation request — Phase V.
+ */
+export interface TaskCreate {
+  description: string;
+  priority?: string;
+  tags?: string[];
+  due_date?: string;
+  reminder_at?: string;
+  recurring_pattern?: string;
+  category?: string;
+  estimated_duration?: string;
+  ai_tags?: string;
+  ai_suggestions?: string;
+}
+
+/**
+ * Task update request — Phase V (partial).
  */
 export interface TaskUpdate {
-  description: string;
+  description?: string;
+  is_complete?: boolean;
+  priority?: string;
+  tags?: string[];
+  due_date?: string;
+  reminder_at?: string;
+  recurring_pattern?: string;
 }
 
 /**

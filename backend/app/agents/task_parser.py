@@ -200,61 +200,155 @@ def parse_update_input(text: str) -> Dict[str, Any]:
 
 def parse_search_query(text: str) -> Dict[str, Any]:
     """
-    Parse natural language text to extract search filters (keyword, priority, category).
-    
-    Args:
-        text: The user's request (e.g., "Show high priority work tasks")
-        
-    Returns:
-        Dictionary with extracted filters
+    Parse natural language text to extract search filters — Phase V.
+
+    Supports: keyword, priority (low/medium/high/urgent), category,
+    tag, due-date hints, and sort preference.
     """
     clean_text = text.lower().strip()
-    
-    # Priority extraction
+
+    # Priority
     priority = None
-    if "high priority" in clean_text or "urgent" in clean_text:
+    if "urgent" in clean_text:
+        priority = "urgent"
+    elif "high priority" in clean_text or "high" in clean_text:
         priority = "high"
-    elif "low priority" in clean_text or "trivial" in clean_text:
+    elif "low priority" in clean_text or "low" in clean_text:
         priority = "low"
     elif "medium priority" in clean_text:
         priority = "medium"
-    
-    # Category extraction (common categories)
-    categories = ["work", "personal", "shopping", "health", "finance", "study"]
+
+    # Category
+    categories = ["work", "personal", "shopping", "health", "finance", "study", "learning"]
     category = None
     for cat in categories:
         if cat in clean_text:
             category = cat
             break
-            
-    # Keyword extraction (rough attempt after removing common search prefixes)
+
+    # Tag extraction — "tagged X" or "tag X" or "#X"
+    tag = None
+    tag_match = re.search(r"(?:tagged?|#)\s*(\w+)", clean_text)
+    if tag_match:
+        tag = tag_match.group(1)
+
+    # Sort preference
+    sort_by = None
+    if "by due" in clean_text or "by deadline" in clean_text:
+        sort_by = "due_date"
+    elif "by priority" in clean_text:
+        sort_by = "priority"
+    elif "newest" in clean_text or "recent" in clean_text:
+        sort_by = "created_at"
+
+    # Keyword — strip common prefixes
     search_prefixes = [
         r"^show me tasks containing\s+",
         r"^search for tasks with\s+",
         r"^search for\s+",
+        r"^find tasks? (?:about|with|for)\s+",
         r"^list my tasks about\s+",
         r"^show me my\s+",
+        r"^show my\s+",
         r"^list my\s+",
         r"^show\s+",
         r"^list\s+",
-        r"^find\s+"
+        r"^find\s+",
     ]
-    
     keyword = clean_text
     for prefix in search_prefixes:
         keyword = re.sub(prefix, "", keyword, flags=re.IGNORECASE)
-        
-    # Clean up common search terms and keywords
-    keyword = keyword.replace("tasks", "").replace("tasks", "").replace("items", "").replace("todo", "").strip()
-    
-    # If keyword is just the priority or category, set it to None to avoid redundant filtering
-    if keyword == priority or keyword == category:
+
+    noise = ["tasks", "task", "items", "item", "todo", "todos",
+             "high", "low", "medium", "urgent", "priority",
+             "tagged", "tag", "#", "by due", "by deadline", "by priority",
+             "newest", "recent"]
+    for n in noise:
+        keyword = keyword.replace(n, "")
+    keyword = keyword.strip()
+
+    if keyword == priority or keyword == category or keyword == tag:
         keyword = None
-    elif priority and priority in keyword:
-        keyword = keyword.replace(priority, "").replace("priority", "").strip()
-    
+
     return {
         "priority": priority,
         "category": category,
-        "keyword": keyword if keyword else None
+        "tag": tag,
+        "sort_by": sort_by,
+        "keyword": keyword if keyword else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase V — Advanced field extraction
+# ---------------------------------------------------------------------------
+
+_PRIORITY_MAP = {
+    "urgent": "urgent", "asap": "urgent", "critical": "urgent", "فوری": "urgent",
+    "high": "high", "important": "high", "اعلی": "high", "اہم": "high",
+    "medium": "medium", "normal": "medium", "درمیانی": "medium",
+    "low": "low", "trivial": "low", "کم": "low",
+}
+
+_RECURRING_MAP = {
+    "daily": "daily", "every day": "daily", "روزانہ": "daily",
+    "weekly": "weekly", "every week": "weekly", "ہفتہ وار": "weekly",
+    "monthly": "monthly", "every month": "monthly", "ماہانہ": "monthly",
+}
+
+
+def extract_priority(text: str) -> Optional[str]:
+    """Extract priority from natural language text."""
+    lower = text.lower()
+    for kw, val in _PRIORITY_MAP.items():
+        if kw in lower:
+            return val
+    return None
+
+
+def extract_tags(text: str) -> list:
+    """Extract hashtag-style tags from text (e.g. '#work #urgent')."""
+    return re.findall(r"#(\w+)", text)
+
+
+def extract_due_date_hint(text: str) -> Optional[str]:
+    """
+    Extract a due-date hint from text.
+    Returns a human-readable string like 'tomorrow', 'next monday', or an ISO date.
+    """
+    lower = text.lower()
+    patterns = [
+        (r"(?:due|by|before|deadline)\s+(tomorrow)", "tomorrow"),
+        (r"(?:due|by|before|deadline)\s+(today)", "today"),
+        (r"(?:due|by|before|deadline)\s+(next\s+\w+)", None),
+        (r"(\d{4}-\d{2}-\d{2})", None),
+    ]
+    for pat, default_val in patterns:
+        m = re.search(pat, lower)
+        if m:
+            return default_val or m.group(1)
+    return None
+
+
+def extract_recurring(text: str) -> Optional[str]:
+    """Extract recurring pattern from text."""
+    lower = text.lower()
+    for kw, val in _RECURRING_MAP.items():
+        if kw in lower:
+            return val
+    return None
+
+
+def parse_advanced_task_input(text: str) -> Dict[str, Any]:
+    """
+    Phase V: Parse natural language into a full task creation payload.
+    Extracts title, priority, tags, due_date hint, and recurring pattern.
+    """
+    base = parse_task_input(text)
+    return {
+        **base,
+        "priority": extract_priority(text),
+        "tags": extract_tags(text),
+        "due_date_hint": extract_due_date_hint(text),
+        "recurring": extract_recurring(text),
     }

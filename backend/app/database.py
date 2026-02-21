@@ -61,14 +61,47 @@ else:
     )
 
 
+def _ensure_phase_v_columns() -> None:
+    """
+    Add missing Phase V columns to tasks table if they don't exist.
+    Works with SQLite and PostgreSQL. Idempotent.
+    """
+    from sqlalchemy import inspect, text
+
+    with engine.connect() as conn:
+        insp = inspect(conn)
+        if "tasks" not in insp.get_table_names():
+            return
+        cols = {c["name"] for c in insp.get_columns("tasks")}
+        is_sqlite = "sqlite" in str(engine.url)
+        # Column name -> (SQLite type, PG type)
+        to_add = {
+            "priority": ("TEXT", "VARCHAR(20)"),
+            "tags": ("TEXT", "VARCHAR(500)"),
+            "due_date": ("TEXT", "TIMESTAMP"),
+            "reminder_at": ("TEXT", "TIMESTAMP"),
+            "recurring_pattern": ("TEXT", "VARCHAR(50)"),
+            "category": ("TEXT", "VARCHAR(50)"),
+            "estimated_duration": ("TEXT", "VARCHAR(50)"),
+            "ai_tags": ("TEXT", "VARCHAR(500)"),
+            "ai_suggestions": ("TEXT", "VARCHAR(1000)"),
+        }
+        for col_name, (sqlite_t, pg_t) in to_add.items():
+            if col_name not in cols:
+                t = sqlite_t if is_sqlite else pg_t
+                conn.execute(text(f'ALTER TABLE tasks ADD COLUMN "{col_name}" {t}'))
+                conn.commit()
+
+
 def init_db() -> None:
     """
-    Create all database tables.
+    Create all database tables and ensure Phase V columns exist.
 
-    This function creates all tables defined in SQLModel models.
-    In production, use Alembic migrations instead.
+    This function creates all tables defined in SQLModel models,
+    then adds any missing Phase V columns to existing tables.
     """
     SQLModel.metadata.create_all(engine)
+    _ensure_phase_v_columns()
 
 
 def get_session() -> Generator[Session, None, None]:

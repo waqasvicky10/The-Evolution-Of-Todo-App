@@ -3,6 +3,9 @@ Event publisher service — Phase V.
 
 Publishes task lifecycle events to Dapr pubsub (backed by Redpanda/Kafka).
 Falls back to logging when Dapr sidecar is unavailable (Vercel, local dev).
+
+Now integrates with KafkaAgent for P+Q+P audit trail and the consumer
+pipeline (recurring, audit, real-time sync).
 """
 
 import json
@@ -21,6 +24,8 @@ PUBSUB_NAME = "task-pubsub"
 TOPIC_TASK_EVENTS = "task-events"
 TOPIC_REMINDERS = "reminders"
 TOPIC_TASK_UPDATES = "task-updates"
+TOPIC_AUDIT_LOG = "audit-log"
+TOPIC_RECURRING = "recurring-tasks"
 
 
 def _is_dapr_available() -> bool:
@@ -80,6 +85,12 @@ async def emit_task_created(task_id: int, user_id: int, description: str) -> Non
         "user_id": user_id,
         "description": description,
     })
+    await publish_event(TOPIC_AUDIT_LOG, {
+        "event": "audit.create",
+        "task_id": task_id,
+        "user_id": user_id,
+        "details": {"description": description},
+    })
 
 
 async def emit_task_updated(task_id: int, user_id: int, changes: Dict[str, Any]) -> None:
@@ -89,6 +100,12 @@ async def emit_task_updated(task_id: int, user_id: int, changes: Dict[str, Any])
         "user_id": user_id,
         "changes": changes,
     })
+    await publish_event(TOPIC_AUDIT_LOG, {
+        "event": "audit.update",
+        "task_id": task_id,
+        "user_id": user_id,
+        "details": {"changes": changes},
+    })
 
 
 async def emit_task_deleted(task_id: int, user_id: int) -> None:
@@ -97,14 +114,37 @@ async def emit_task_deleted(task_id: int, user_id: int) -> None:
         "task_id": task_id,
         "user_id": user_id,
     })
+    await publish_event(TOPIC_AUDIT_LOG, {
+        "event": "audit.delete",
+        "task_id": task_id,
+        "user_id": user_id,
+        "details": {},
+    })
 
 
-async def emit_task_completed(task_id: int, user_id: int) -> None:
+async def emit_task_completed(
+    task_id: int,
+    user_id: int,
+    recurring_pattern: Optional[str] = None,
+) -> None:
     await publish_event(TOPIC_TASK_EVENTS, {
         "event": "task.completed",
         "task_id": task_id,
         "user_id": user_id,
     })
+    await publish_event(TOPIC_AUDIT_LOG, {
+        "event": "audit.complete",
+        "task_id": task_id,
+        "user_id": user_id,
+        "details": {},
+    })
+    if recurring_pattern:
+        await publish_event(TOPIC_RECURRING, {
+            "event": "task.needs_reschedule",
+            "task_id": task_id,
+            "user_id": user_id,
+            "recurring_pattern": recurring_pattern,
+        })
 
 
 async def emit_reminder(task_id: int, user_id: int, description: str) -> None:

@@ -1,0 +1,9 @@
+# Skill: TagManagement
+Description: Add, remove, and filter tasks by user-defined hashtags.
+Tool: update_todo(user_id, todo_id, tags=["work", "meeting"])
+Purpose: Categorise tasks with custom labels for filtering and organisation.
+Usage: "Tag task 5 with work meeting" -> update_todo(todo_id=5, tags=["work", "meeting"]).
+Storage: JSON string in Task.tags column, accessed via task.tags_list property.
+Extract: task_parser.extract_tags() finds hashtags in natural language.
+Filter: GET /api/tasks/search?tag=work (ILIKE substring match).
+Display: Frontend teal pills for each tag.

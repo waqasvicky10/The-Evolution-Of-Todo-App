@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     # On Vercel, /tmp is the only writable directory
     DATABASE_URL: str = "sqlite:////tmp/todo.db" if __import__('os').environ.get("VERCEL") == "1" else "sqlite:///./todo.db"
 
-    # Security
-    SECRET_KEY: str
+    # Security (required in prod; default for local dev)
+    SECRET_KEY: str = "local-dev-secret-key-change-in-production-32chars"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7

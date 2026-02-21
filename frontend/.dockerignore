@@ -1,0 +1,15 @@
+# Frontend Docker build - exclude from context
+node_modules
+.next
+out
+npm-debug.log
+.env
+.env.local
+.env.production
+.git
+.gitignore
+*.md
+cypress
+.cypress
+coverage
+.pytest_cache

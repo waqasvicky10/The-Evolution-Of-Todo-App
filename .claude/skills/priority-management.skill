@@ -1,0 +1,8 @@
+# Skill: PriorityManagement
+Description: Set and filter tasks by priority (low/medium/high/urgent).
+Tool: update_todo(user_id, todo_id, priority="high")
+Purpose: Organise tasks by importance with coloured badges and sort support.
+Usage: "Set task 5 priority to high" -> update_todo(todo_id=5, priority="high").
+Levels: low (green), medium (yellow), high (red), urgent (purple).
+Filter: GET /api/tasks/search?priority=high
+Sort: GET /api/tasks/search?sort_by=priority and sort_order=desc

@@ -25,6 +25,33 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - todo-net
+
+  # ---------- Topic auto-creation (runs once, then exits) ----------
+  redpanda-init:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.1
+    container_name: redpanda-init
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      echo 'Waiting for Redpanda to be ready...' &&
+      rpk cluster health --brokers redpanda:9092 --watch &&
+      echo 'Creating Phase V topics...' &&
+      rpk topic create task-events   --partitions 3 --replicas 1 --brokers redpanda:9092 || true &&
+      rpk topic create reminders     --partitions 1 --replicas 1 --brokers redpanda:9092 || true &&
+      rpk topic create task-updates  --partitions 3 --replicas 1 --brokers redpanda:9092 || true &&
+      rpk topic create audit-log     --partitions 1 --replicas 1 --brokers redpanda:9092 || true &&
+      rpk topic create recurring-tasks --partitions 1 --replicas 1 --brokers redpanda:9092 || true &&
+      echo 'All topics created:' &&
+      rpk topic list --brokers redpanda:9092
+      "
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - todo-net
 
   # ---------- Redpanda Console (optional UI, free) ----------
   redpanda-console:
@@ -37,6 +64,8 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
+    networks:
+      - todo-net
 
   # ---------- Backend (FastAPI + Dapr sidecar) ----------
   backend:
@@ -96,6 +125,8 @@ services:
     build:
       context: ./frontend
       dockerfile: frontend.Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ""
     container_name: todo-frontend
     ports:
       - "3000:3000"
@@ -103,7 +134,6 @@ services:
       backend:
         condition: service_healthy
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
       API_URL: http://backend:8000
     restart: unless-stopped
     networks:

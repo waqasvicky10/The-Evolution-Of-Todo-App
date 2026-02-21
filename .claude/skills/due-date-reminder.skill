@@ -1,0 +1,8 @@
+# Skill: DueDateReminder
+Description: Set due dates and reminders on tasks, with Dapr cron auto-check.
+Tool: create_todo(user_id, title, due_date="2026-03-01", reminder_at="2026-02-28T10:00:00")
+Purpose: Track deadlines and get notified before tasks are overdue.
+Usage: "Add task submit report due March 1st with reminder Feb 28" -> create_todo(...).
+Cron: Dapr binding @every 5m -> POST /reminder-cron -> process_due_reminders().
+Overdue: GET /api/tasks/overdue returns past-due incomplete tasks.
+Reminder clears: reminder_at set to NULL after firing (no duplicates).

@@ -1,0 +1,9 @@
+# Skill: KafkaEvents
+Description: Manage Redpanda/Kafka event-driven infrastructure for Phase V.
+Tool: KafkaAgent.full_setup()
+Purpose: Create topics, publish events, manage consumers for task lifecycle.
+Usage: POST /api/kafka/full-setup
+Topics: task-events (3 parts), reminders (1), task-updates (3), audit-log (1), recurring-tasks (1).
+Consumers: RecurringTaskConsumer, AuditLogConsumer, RealTimeSyncConsumer.
+Publish: event_service.emit_task_created/updated/deleted/completed via Dapr pubsub to Redpanda.
+Docker: redpanda + redpanda-init (auto-create topics) + redpanda-console (UI at port 8080).

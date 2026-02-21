@@ -144,6 +144,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearAuth]);
 
   /**
+   * Listen for session expiry (e.g. when token refresh fails after 401).
+   */
+  useEffect(() => {
+    const handler = () => {
+      clearAuth();
+      router.push("/login?expired=1");
+    };
+    window.addEventListener("auth:session-expired", handler);
+    return () => window.removeEventListener("auth:session-expired", handler);
+  }, [clearAuth, router]);
+
+  /**
    * Refresh access token using refresh token.
    */
   const refreshAuth = useCallback(async () => {

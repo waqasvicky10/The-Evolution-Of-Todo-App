@@ -18,7 +18,7 @@ export default function LandingPage() {
             Todo App
           </h1>
           <p className="text-xl text-gray-600">
-            Phase II - Full-Stack Web Application
+            Phase V - Event-Driven Architecture
           </p>
         </div>
 
@@ -40,21 +40,21 @@ export default function LandingPage() {
             <div className="text-3xl mb-3">🔒</div>
             <h3 className="font-semibold text-gray-900 mb-2">Secure</h3>
             <p className="text-sm text-gray-600">
-              JWT authentication with password hashing
+              JWT auth, Dapr secrets, Kubernetes
             </p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="text-3xl mb-3">💾</div>
-            <h3 className="font-semibold text-gray-900 mb-2">Persistent</h3>
+            <div className="text-3xl mb-3">⚡</div>
+            <h3 className="font-semibold text-gray-900 mb-2">Event-Driven</h3>
             <p className="text-sm text-gray-600">
-              PostgreSQL database storage
+              Dapr + Redpanda for real-time events
             </p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="text-3xl mb-3">👥</div>
-            <h3 className="font-semibold text-gray-900 mb-2">Multi-User</h3>
+            <div className="text-3xl mb-3">🤖</div>
+            <h3 className="font-semibold text-gray-900 mb-2">AI Powered</h3>
             <p className="text-sm text-gray-600">
-              Isolated user data with full privacy
+              Chat agent, voice commands, smart tasks
             </p>
           </div>
         </div>

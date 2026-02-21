@@ -1,0 +1,8 @@
+# Skill: UrduVoice
+Description: Urdu chatbot support + browser Speech API voice commands.
+Tool: Browser SpeechRecognition API + mock_provider Urdu regex
+Purpose: Bilingual (English + Urdu) task management with voice input.
+Urdu intents: فہرست (list), شامل کریں (add), مکمل (complete), حذف (delete), اپڈیٹ (update), مدت ختم (overdue), فوری (urgent), تلاش (search).
+Voice: window.SpeechRecognition with lang="ur-PK" or "en-US" auto-switched by LanguageContext.
+Frontend: 30 Urdu translation keys, 4 Urdu quick-command buttons.
+Ordinals: پہلا=1, دوسرا=2, تیسرا=3, چوتھا=4, پانچواں=5.

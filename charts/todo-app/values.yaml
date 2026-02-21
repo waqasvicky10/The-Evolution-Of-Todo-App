@@ -49,6 +49,10 @@ frontend:
     limits:
       cpu: 500m
       memory: 512Mi
+  dapr:
+    enabled: true
+    appId: todo-frontend
+    appPort: 3000
 
 # ---------- Redpanda (local) ----------
 redpanda:

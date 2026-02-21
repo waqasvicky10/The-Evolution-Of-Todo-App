@@ -24,22 +24,17 @@ import {
 // Constants
 // ============================================================================
 
+// Empty = use relative URLs → Next.js rewrites proxy to backend (no CORS, faster)
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/$/, "");
-
 
 // ============================================================================
 // Axios Instance
 // ============================================================================
 
-/**
- * Axios instance with base configuration.
- */
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-  timeout: 30000, // 30 second timeout (increased for slow database connections)
+  headers: { "Content-Type": "application/json" },
+  timeout: 10000, // 10s — fail fast if backend unreachable
 });
 
 
@@ -126,6 +121,13 @@ apiClient.interceptors.response.use(
       if (!storedRefreshToken) {
         isRefreshing = false;
         processQueue(error, null);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("todo_access_token");
+          localStorage.removeItem("todo_refresh_token");
+          localStorage.removeItem("todo_user");
+          setAuthToken(null);
+          window.dispatchEvent(new CustomEvent("auth:session-expired"));
+        }
         return Promise.reject(error);
       }
 
@@ -153,8 +155,10 @@ apiClient.interceptors.response.use(
           localStorage.removeItem("todo_access_token");
           localStorage.removeItem("todo_refresh_token");
           localStorage.removeItem("todo_user");
+          setAuthToken(null);
+          // Notify AuthContext to clear state and redirect
+          window.dispatchEvent(new CustomEvent("auth:session-expired"));
         }
-        setAuthToken(null);
 
         return Promise.reject(refreshError);
       } finally {
@@ -224,7 +228,7 @@ export function getErrorMessage(error: unknown): string {
 export async function register(data: RegisterRequest): Promise<User> {
   try {
     const response = await apiClient.post<User>("/api/auth/register", data, {
-      timeout: 30000, // 30 seconds for registration (database query may be slow)
+      timeout: 15000,
     });
     return response.data;
   } catch (error: any) {
@@ -245,7 +249,7 @@ export async function register(data: RegisterRequest): Promise<User> {
 export async function login(data: LoginRequest): Promise<TokenResponse> {
   try {
     const response = await apiClient.post<TokenResponse>("/api/auth/login", data, {
-      timeout: 30000, // 30 seconds for login (database query may be slow)
+      timeout: 15000,
     });
     return response.data;
   } catch (error: any) {

@@ -63,6 +63,7 @@ export default function TaskCard({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
+      case 'urgent': return 'text-purple-700 bg-purple-50 border-purple-200';
       case 'high': return 'text-red-600 bg-red-50 border-red-200';
       case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
       case 'low': return 'text-green-600 bg-green-50 border-green-200';
@@ -81,9 +82,19 @@ export default function TaskCard({
     }
   };
 
-  // Parse AI metadata
-  const aiTags = task.ai_tags ? JSON.parse(task.ai_tags) : [];
-  const aiSuggestions = task.ai_suggestions ? JSON.parse(task.ai_suggestions) : [];
+  const getRecurringLabel = (pattern: string) => {
+    switch (pattern) {
+      case 'daily': return 'Daily';
+      case 'weekly': return 'Weekly';
+      case 'monthly': return 'Monthly';
+      default: return pattern;
+    }
+  };
+
+  const isOverdue = task.due_date && !task.is_complete && new Date(task.due_date) < new Date();
+  const tags = task.tags || [];
+  const aiTags = task.ai_tags ? (() => { try { return JSON.parse(task.ai_tags!); } catch { return []; } })() : [];
+  const aiSuggestions = task.ai_suggestions ? (() => { try { return JSON.parse(task.ai_suggestions!); } catch { return []; } })() : [];
 
   const cardClassName = task.is_complete
     ? "bg-gray-50 rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition"
@@ -173,42 +184,65 @@ export default function TaskCard({
             </div>
           </div>
 
-          {/* AI Metadata */}
-          {(task.category || task.priority || task.estimated_duration || aiTags.length > 0) && (
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              {/* Category */}
-              {task.category && (
-                <div className="flex items-center text-sm text-gray-600">
-                  <span className="mr-1">{getCategoryIcon(task.category)}</span>
-                  <span className="capitalize">{task.category}</span>
-                </div>
-              )}
+          {/* Phase V metadata row */}
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {/* Priority */}
+            {task.priority && (
+              <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize border ${getPriorityColor(task.priority)}`}>
+                {task.priority}
+              </span>
+            )}
 
-              {/* Priority */}
-              {task.priority && (
-                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize border ${getPriorityColor(task.priority)}`}>
-                  {task.priority}
-                </span>
-              )}
+            {/* Category */}
+            {task.category && (
+              <div className="flex items-center text-sm text-gray-600">
+                <span className="mr-1">{getCategoryIcon(task.category)}</span>
+                <span className="capitalize">{task.category}</span>
+              </div>
+            )}
 
-              {/* Duration */}
-              {task.estimated_duration && (
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                  ⏱️ {task.estimated_duration}
-                </span>
-              )}
+            {/* Due date */}
+            {task.due_date && (
+              <span className={`inline-flex items-center px-2 py-1 text-xs rounded-full ${isOverdue ? 'bg-red-100 text-red-700 font-semibold' : 'bg-gray-100 text-gray-600'}`}>
+                {isOverdue ? '⚠️' : '📅'} {new Date(task.due_date).toLocaleDateString()}
+              </span>
+            )}
 
-              {/* AI Tags */}
-              {aiTags.map((tag: string, index: number) => (
-                <span
-                  key={index}
-                  className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full"
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
+            {/* Reminder */}
+            {task.reminder_at && !task.is_complete && (
+              <span className="inline-flex items-center px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">
+                🔔 {new Date(task.reminder_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+
+            {/* Recurring */}
+            {task.recurring_pattern && (
+              <span className="inline-flex items-center px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
+                🔁 {getRecurringLabel(task.recurring_pattern)}
+              </span>
+            )}
+
+            {/* Duration */}
+            {task.estimated_duration && (
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                ⏱️ {task.estimated_duration}
+              </span>
+            )}
+
+            {/* User tags (Phase V) */}
+            {tags.map((tag: string, index: number) => (
+              <span key={`tag-${index}`} className="inline-flex px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">
+                #{tag}
+              </span>
+            ))}
+
+            {/* AI Tags */}
+            {aiTags.map((tag: string, index: number) => (
+              <span key={`ai-${index}`} className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                #{tag}
+              </span>
+            ))}
+          </div>
 
           {/* AI Suggestions (collapsed by default) */}
           {aiSuggestions.length > 0 && !task.is_complete && (

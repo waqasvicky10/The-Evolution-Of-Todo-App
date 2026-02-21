@@ -9,15 +9,19 @@
 
 import { useState, FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/api";
 
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const sessionExpired = searchParams.get("expired") === "1";
+
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -92,6 +96,13 @@ export default function LoginPage() {
                 placeholder="••••••••"
               />
             </div>
+
+            {/* Session Expired Message */}
+            {sessionExpired && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
+                Your session expired. Please log in again.
+              </div>
+            )}
 
             {/* Error Message */}
             {error && (

@@ -14,6 +14,34 @@ from .base import LLMProvider
 logger = logging.getLogger(__name__)
 
 
+def _add_task_input(user_id: int, raw: str) -> tuple:
+    """Parse add-task input: extract title and priority (e.g. 'urgent task call mom' -> title='call mom', priority='urgent')."""
+    raw = raw.strip()
+    if not raw:
+        return ("What would you like to add?", [])
+    priority = None
+    title = raw
+    # Strip leading priority words
+    for p in ("urgent", "high", "medium", "low"):
+        pat = re.compile(rf"^{p}\s+(?:priority\s+)?(?:task\s+)?(?:to\s+)?", re.IGNORECASE)
+        if pat.match(raw):
+            priority = p
+            title = pat.sub("", raw).strip()
+            break
+        # "urgent task call mom" -> strip "urgent task " or "urgent task to "
+        pat2 = re.compile(rf"^{p}\s+task\s+(?:to\s+)?", re.IGNORECASE)
+        if pat2.match(raw):
+            priority = p
+            title = pat2.sub("", raw).strip()
+            break
+    if not title or not title.replace(" ", ""):
+        return ("What would you like to add? (e.g. 'call mom', 'buy groceries')", [])
+    inp = {"user_id": user_id, "title": title.capitalize()}
+    if priority:
+        inp["priority"] = priority
+    return (f"Sure! I'll add '{title.capitalize()}' to your list." + (f" (Priority: {priority})" if priority else ""), [{"name": "create_todo", "input": inp}])
+
+
 class MockProvider(LLMProvider):
     """
     Mock LLM provider using keyword-based intent recognition.
@@ -134,6 +162,11 @@ class MockProvider(LLMProvider):
                     "language": "ur" if is_urdu_msg else "en"
                 }
         
+        # 1b. Phase V intents (search, overdue, priority, tags)
+        phase_v = self._process_phase_v_intents(msg, user_id, is_urdu_msg)
+        if phase_v:
+            return phase_v
+
         # 2. Define Rules
         if is_urdu_msg:
             rules = [
@@ -168,13 +201,12 @@ class MockProvider(LLMProvider):
                 ("list_completed", r"(?:what|show|list|get).*(completed|finished|done|complete)", 
                  lambda m, ctx: ("Fetching your completed tasks...", [])),
                 
-                # General list (catch-all)
-                ("list", r"(show|list|get|fetch|what are|display).*(task|todo|list|items)", 
+                # General list (catch-all) — "show my tasks", "show tasks", "my tasks", "list tasks"
+                ("list", r"(show|list|get|fetch|what are|display|my)\s*(my\s+)?(tasks?|todos?|list|items)", 
                  lambda m, ctx: ("Fetching your todo list...", [])),
                  
                 ("add", r"(?:add|create|new task|remember to|remind me to)\s+(?:a task to|a task|to|task|that)?\s*(.+)", 
-                 lambda m, ctx: (f"Sure! I'll add '{m.group(1).strip().capitalize()}' to your list.", 
-                            [{"name": "create_todo", "input": {"user_id": user_id, "title": m.group(1).strip().capitalize()}}])),
+                 lambda m, ctx: _add_task_input(user_id, m.group(1).strip())),
 
                 # Implicit "Task [description]" for voice/shorthand (e.g. "a task by groceries")
                 ("add_implicit", r"(?:^|\s)(?:a\s+)?task\s+(?!id\b|number\b|\d)(?:to\s+|about\s+|by\s+|for\s+)?(.+)", 
@@ -250,10 +282,102 @@ class MockProvider(LLMProvider):
             "language": "ur" if is_urdu_msg else "en"
         }
     
+    def _process_phase_v_intents(self, msg: str, user_id: int, is_urdu: bool) -> Optional[Dict[str, Any]]:
+        """Phase V intent patterns: search, overdue, priority, tags, due date, recurring."""
+        lang = "ur" if is_urdu else "en"
+
+        # Overdue
+        if re.search(r"overdue|late|missed|past due|مدت ختم|دیر", msg, re.IGNORECASE):
+            return {
+                "response_text": "آپ کی مدت ختم شدہ ٹاسکس حاصل کی جا رہی ہیں..." if is_urdu else "Fetching your overdue tasks...",
+                "tool_calls": [{"tool_use_id": f"mock_overdue_{user_id}", "name": "get_overdue_todos", "input": {"user_id": user_id}}],
+                "requires_tool_execution": True, "stop_reason": "end_turn", "language": lang,
+            }
+
+        # Priority set — "set task 5 priority to high"
+        prio_match = re.search(r"(?:set|change|make)\s+(?:task|id)?\s*(\d+)\s+(?:priority|prio)\s+(?:to\s+)?(urgent|high|medium|low)", msg, re.IGNORECASE)
+        if prio_match:
+            tid, prio = int(prio_match.group(1)), prio_match.group(2).lower()
+            return {
+                "response_text": f"Setting task {tid} priority to {prio}.",
+                "tool_calls": [{"tool_use_id": f"mock_prio_{user_id}", "name": "update_todo", "input": {"user_id": user_id, "todo_id": tid, "priority": prio}}],
+                "requires_tool_execution": True, "stop_reason": "end_turn", "language": lang,
+            }
+
+        # Recurring set — "make task 3 repeat weekly" / "set task 2 recurring daily"
+        recur_match = re.search(r"(?:make|set)\s+(?:task|id)?\s*(\d+)\s+(?:repeat|recurring|recur)\s+(?:to\s+)?(daily|weekly|monthly)", msg, re.IGNORECASE)
+        if recur_match:
+            tid, pattern = int(recur_match.group(1)), recur_match.group(2).lower()
+            return {
+                "response_text": f"Setting task {tid} to repeat {pattern}.",
+                "tool_calls": [{"tool_use_id": f"mock_recur_{user_id}", "name": "update_todo", "input": {"user_id": user_id, "todo_id": tid, "recurring_pattern": pattern}}],
+                "requires_tool_execution": True, "stop_reason": "end_turn", "language": lang,
+            }
+
+        # Tag add — "tag task 5 with work meeting" / "add tags #work #meeting to task 5"
+        tag_match = re.search(r"(?:tag|add tags?)\s+(?:task|id)?\s*(\d+)\s+(?:with|as|:)?\s*(.+)", msg, re.IGNORECASE)
+        if tag_match:
+            tid = int(tag_match.group(1))
+            raw_tags = re.findall(r"#?(\w+)", tag_match.group(2))
+            if raw_tags:
+                return {
+                    "response_text": f"Adding tags {raw_tags} to task {tid}.",
+                    "tool_calls": [{"tool_use_id": f"mock_tag_{user_id}", "name": "update_todo", "input": {"user_id": user_id, "todo_id": tid, "tags": raw_tags}}],
+                    "requires_tool_execution": True, "stop_reason": "end_turn", "language": lang,
+                }
+
+        # Skip search if user is ADDING a task (add/create/remind at start)
+        if re.search(r"^(add|create|new task|remember to|remind me to)\s+", msg, re.IGNORECASE):
+            return None
+
+        # Due today / due this week — shortcut searches
+        if re.search(r"\bdue\s+today\b", msg, re.IGNORECASE):
+            return {
+                "response_text": "Fetching tasks due today...",
+                "tool_calls": [{"tool_use_id": f"mock_due_today_{user_id}", "name": "search_todos", "input": {"user_id": user_id, "sort_by": "due_date", "sort_order": "asc"}}],
+                "requires_tool_execution": True, "stop_reason": "end_turn", "language": lang,
+            }
+
+        # Search / Find tasks — "Search tasks" (no keyword) or "Find tasks tagged #" (no tag) -> list all
+        if re.search(r"^search\s*tasks?\s*$", msg, re.IGNORECASE) or re.search(r"^find\s+tasks?\s+tagged\s*#?\s*$", msg, re.IGNORECASE) or re.search(r"^search\s*$", msg, re.IGNORECASE):
+            return {
+                "response_text": "Fetching your todo list...",
+                "tool_calls": [{"tool_use_id": f"mock_list_{user_id}", "name": "list_todos", "input": {"user_id": user_id}}],
+                "requires_tool_execution": True, "stop_reason": "end_turn", "language": lang,
+            }
+
+        # Advanced search — only when user explicitly searches (not when adding)
+        has_search_keyword = re.search(r"\b(search|find|filter)\b", msg, re.IGNORECASE)
+        has_qualifier = re.search(r"\b(tagged|tag|#\w+|urgent|high|low|medium|priority|sort|due|before|after|about|containing)\b", msg, re.IGNORECASE)
+
+        if has_search_keyword or has_qualifier:
+            from ..task_parser import parse_search_query
+            filters = parse_search_query(msg)
+            has_real_filter = any(filters.get(k) for k in ("keyword", "priority", "tag", "sort_by"))
+            if has_real_filter:
+                tool_input: Dict[str, Any] = {"user_id": user_id}
+                if filters.get("keyword"):
+                    tool_input["q"] = filters["keyword"]
+                if filters.get("priority"):
+                    tool_input["priority"] = filters["priority"]
+                if filters.get("tag"):
+                    tool_input["tag"] = filters["tag"]
+                if filters.get("sort_by"):
+                    tool_input["sort_by"] = filters["sort_by"]
+
+                return {
+                    "response_text": "تلاش کی جا رہی ہے..." if is_urdu else "Searching your tasks...",
+                    "tool_calls": [{"tool_use_id": f"mock_search_{user_id}", "name": "search_todos", "input": tool_input}],
+                    "requires_tool_execution": True, "stop_reason": "end_turn", "language": lang,
+                }
+
+        return None
+
     def get_model_info(self) -> Dict[str, Any]:
         """Get mock provider info."""
         return {
-            "model": "local-mock-v1",
+            "model": "local-mock-v2-phase-v",
             "provider": "local",
-            "capabilities": ["english", "urdu", "voice-ready", "context-aware"]
+            "capabilities": ["english", "urdu", "voice-ready", "context-aware",
+                             "search", "priority", "tags", "due-dates", "recurring", "overdue"]
         }

@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubectl-ai-prompts
+  namespace: default
+data:
+  check-health: |
+    Check the health of all todo-app pods:
+    kubectl get pods -l app.kubernetes.io/instance=todo-app -o wide
+    kubectl top pods -l app.kubernetes.io/instance=todo-app
+
+  check-dapr: |
+    Verify Dapr sidecars are running:
+    kubectl get pods -n dapr-system
+    kubectl logs -l app.kubernetes.io/name=todo-backend -c daprd --tail=20
+
+  check-redpanda: |
+    Verify Redpanda cluster health:
+    kubectl exec -it todo-app-redpanda-0 -- rpk cluster health
+    kubectl exec -it todo-app-redpanda-0 -- rpk topic list
+
+  check-events: |
+    Check task events in Redpanda:
+    kubectl exec -it todo-app-redpanda-0 -- rpk topic consume task-events --num 5
+
+  restart-backend: |
+    Restart the backend deployment:
+    kubectl rollout restart deployment/todo-backend
+    kubectl rollout status deployment/todo-backend --timeout=120s
+
+  scale-backend: |
+    Scale backend to handle more load:
+    kubectl scale deployment/todo-backend --replicas=3
+    kubectl get pods -l app.kubernetes.io/name=todo-backend -w

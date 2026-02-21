@@ -28,6 +28,10 @@ export default function DashboardPage() {
 
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "completed">("all");
+  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "priority" | "dueDate">("newest");
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -94,9 +98,37 @@ export default function DashboardPage() {
     }
   };
 
-  // Filter tasks
-  const incompleteTasks = tasks.filter(task => !task.is_complete);
-  const completedTasks = tasks.filter(task => task.is_complete);
+  // Phase V: search + filter + sort
+  const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+  const filteredTasks = tasks
+    .filter((task) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchDesc = task.description.toLowerCase().includes(q);
+        const matchTags = (task.tags || []).some((t) => t.toLowerCase().includes(q));
+        if (!matchDesc && !matchTags) return false;
+      }
+      if (filterStatus === "active" && task.is_complete) return false;
+      if (filterStatus === "completed" && !task.is_complete) return false;
+      if (filterPriority !== "all" && task.priority !== filterPriority) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (sortBy === "priority") return (priorityOrder[a.priority || "medium"] ?? 2) - (priorityOrder[b.priority || "medium"] ?? 2);
+      if (sortBy === "dueDate") {
+        if (!a.due_date && !b.due_date) return 0;
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+  const incompleteTasks = filteredTasks.filter(task => !task.is_complete);
+  const completedTasks = filteredTasks.filter(task => task.is_complete);
+  const overdueTasks = tasks.filter(task => task.due_date && !task.is_complete && new Date(task.due_date) < new Date());
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -130,6 +162,54 @@ export default function DashboardPage() {
           }}
           isVisible={true}
         />
+
+        {/* Phase V: Search / Filter / Sort toolbar */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-3">
+            <input
+              type="text"
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
+            />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+            </select>
+            <select
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="priority">Priority</option>
+              <option value="dueDate">Due Date</option>
+            </select>
+          </div>
+          {overdueTasks.length > 0 && (
+            <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              ⚠️ You have {overdueTasks.length} overdue task{overdueTasks.length > 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
 
         {/* Tasks Error */}
         {tasksError && (

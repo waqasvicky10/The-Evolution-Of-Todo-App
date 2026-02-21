@@ -11,13 +11,15 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 
-
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 
 export const metadata: Metadata = {
-  title: "Todo App - Phase II",
-  description: "A modern, multi-user todo application with secure authentication",
+  title: "Todo App - Phase V",
+  description: "Event-driven todo app with Dapr, Redpanda, AI chatbot, and advanced task management",
+  icons: {
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>",
+  },
 };
 
 

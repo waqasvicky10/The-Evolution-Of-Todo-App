@@ -1,0 +1,9 @@
+# Skill: DeployDOKS
+Description: Deploy the todo app to DigitalOcean Kubernetes (DOKS) using Helm charts.
+Tool: DeploymentAgent.full_deploy(image_tag="latest")
+Purpose: One-command cloud deployment with Dapr sidecars, Redpanda, and CI/CD.
+Usage: POST /api/deployment/full-deploy
+Pipeline: create_cluster -> install_dapr -> deploy_app -> verify_deployment -> get_helm_status.
+AI Ops: kubectl-ai for natural-language kubectl, kagent for monitoring.
+CI/CD: .github/workflows/ci-cd.yaml triggers on push to main.
+P+Q+P: Every step documents Problem, Question, Pattern.

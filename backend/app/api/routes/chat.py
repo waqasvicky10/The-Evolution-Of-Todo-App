@@ -89,6 +89,9 @@ async def execute_tool_calls_async(tool_calls: List[Dict[str, Any]], user_id: in
     from app.services.task_service import (
         create_task as service_create_task,
         get_user_tasks as service_get_user_tasks,
+        search_tasks as service_search_tasks,
+        get_overdue_tasks as service_get_overdue_tasks,
+        get_task as service_get_task,
         update_task as service_update_task,
         delete_task as service_delete_task,
         get_task_by_id as service_get_task_by_id,
@@ -99,8 +102,8 @@ async def execute_tool_calls_async(tool_calls: List[Dict[str, Any]], user_id: in
     results = []
     
     for tool_call in tool_calls:
-        tool_name = tool_call.get("name", "")
-        tool_input = tool_call.get("input", {})
+        tool_name = (tool_call.get("name") or "").strip()
+        tool_input = tool_call.get("input", {}) or {}
         
         try:
             if tool_name == "get_user_context":
@@ -120,7 +123,7 @@ async def execute_tool_calls_async(tool_calls: List[Dict[str, Any]], user_id: in
                 })
                 
             elif tool_name == "create_todo":
-                # Create task using FastAPI service
+                # Create task using FastAPI service (supports Phase V: priority, tags, due_date)
                 title = tool_input.get("title", "")
                 if not title:
                     results.append({
@@ -130,9 +133,16 @@ async def execute_tool_calls_async(tool_calls: List[Dict[str, Any]], user_id: in
                         }
                     })
                     continue
-                
-                # Use service function signature: create_task(db, user_id, description: str)
-                task = service_create_task(db, user_id, title)
+                priority = tool_input.get("priority")
+                tags = tool_input.get("tags")
+                due_date = tool_input.get("due_date")
+                if isinstance(due_date, str) and due_date:
+                    try:
+                        from datetime import datetime
+                        due_date = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
+                    except (ValueError, TypeError):
+                        due_date = None
+                task = service_create_task(db, user_id, title, priority=priority, tags=tags, due_date=due_date)
                 results.append({
                     "content": {
                         "success": True,
@@ -175,32 +185,40 @@ async def execute_tool_calls_async(tool_calls: List[Dict[str, Any]], user_id: in
                     }
                 })
                 
-            elif tool_name in ["list_tasks", "search_tasks"]:
+            elif tool_name in ["list_tasks", "search_tasks", "search_todos"]:
                 # Handle list_tasks and search_tasks tools (ListTasks & SearchTasks Skills)
                 status = tool_input.get("status", "all")
                 priority = tool_input.get("priority")
                 category = tool_input.get("category")
-                keyword = tool_input.get("keyword")
-                
-                # Filter logic for completed status
-                completed_filter = None
-                if status == "pending":
-                    completed_filter = False
-                elif status == "completed":
-                    completed_filter = True
-                
-                # Get tasks with filters from service
-                tasks = service_get_user_tasks(
-                    db, 
-                    user_id, 
-                    completed=completed_filter,
-                    priority=priority,
-                    category=category
-                )
-                
-                # Secondary filtering for keyword (if not handled by DB or for extra precision)
-                if keyword:
-                    tasks = [t for t in tasks if keyword.lower() in t.description.lower()]
+                keyword = tool_input.get("keyword") or tool_input.get("q")
+                is_complete = tool_input.get("is_complete")
+                tag = tool_input.get("tag")
+                sort_by = tool_input.get("sort_by", "created_at")
+                sort_order = tool_input.get("sort_order", "desc")
+
+                # Use advanced search when search_todos params (q, tag, sort_by) are present
+                use_advanced = bool(keyword or tag or sort_by != "created_at" or sort_order != "desc")
+                if tool_name == "search_todos" and use_advanced:
+                    tasks = service_search_tasks(
+                        db, user_id,
+                        q=keyword, priority=priority, tag=tag,
+                        is_complete=is_complete,
+                        sort_by=sort_by, sort_order=sort_order
+                    )
+                else:
+                    completed_filter = None
+                    if status == "pending" or is_complete is False:
+                        completed_filter = False
+                    elif status == "completed" or is_complete is True:
+                        completed_filter = True
+                    tasks = service_get_user_tasks(
+                        db, user_id,
+                        completed=completed_filter,
+                        priority=priority,
+                        category=category
+                    )
+                    if keyword:
+                        tasks = [t for t in tasks if keyword.lower() in t.description.lower()]
                 
                 # Beautiful Formatting
                 filter_desc = []
@@ -355,7 +373,7 @@ async def execute_tool_calls_async(tool_calls: List[Dict[str, Any]], user_id: in
                     
                     # Update description if provided
                     if title:
-                        updated_task = service_update_task(db, todo_id, user_id, title)
+                        updated_task = service_update_task(db, todo_id, user_id, description=title)
                     else:
                         updated_task = task
                     
@@ -451,6 +469,19 @@ async def execute_tool_calls_async(tool_calls: List[Dict[str, Any]], user_id: in
                         "completed": task.is_complete
                     }
                 })
+
+            elif tool_name == "get_overdue_todos":
+                tasks = service_get_overdue_tasks(db, user_id)
+                todos_list = [{"id": t.id, "title": t.description, "completed": t.is_complete} for t in tasks]
+                results.append({
+                    "content": {
+                        "success": True,
+                        "todos": todos_list,
+                        "count": len(todos_list),
+                        "message": f"You have {len(todos_list)} overdue task(s)." if todos_list else "You have no overdue tasks."
+                    }
+                })
+
             else:
                 results.append({
                     "content": {

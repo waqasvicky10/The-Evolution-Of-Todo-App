@@ -1,0 +1,12 @@
+# Skill: MasterOrchestrator
+Description: Orchestrate all Phase V agents in correct order with P+Q+P audit.
+Tool: MasterPhaseVAgent.run_full_phase_v(image_tag="latest")
+Purpose: Single-command execution of the entire Phase V pipeline.
+Usage: POST /api/master/run-all -> Step 1 (features) -> Step 2 (kafka) -> Step 3 (dapr) -> Step 4 (deploy) -> bonuses.
+Steps:
+  1. AdvancedFeatureAgent: verify recurring, reminders, priorities, tags, search
+  2. KafkaAgent: create 5 topics, verify consumers, check Dapr pubsub
+  3. DaprAgent: install Dapr, apply 5 components, configure sidecars
+  4. DeploymentAgent: create DOKS cluster, deploy Helm, verify pods
+Bonuses: Urdu support (8 intents + 30 translations), voice commands (en-US + ur-PK), reusable intelligence (11 skills).
+Test scenarios: 12 comprehensive scenarios covering every feature.

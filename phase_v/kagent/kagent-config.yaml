@@ -1,0 +1,29 @@
+apiVersion: kagent.dev/v1alpha1
+kind: Agent
+metadata:
+  name: todo-ops-agent
+  namespace: default
+spec:
+  description: "Phase V Todo App Operations Agent"
+  model:
+    provider: mock
+    name: mock-gpt
+  tools:
+    - name: kubectl
+      description: "Execute kubectl commands for cluster management"
+    - name: helm
+      description: "Manage Helm releases"
+    - name: logs
+      description: "Fetch and analyze pod logs"
+  prompts:
+    system: |
+      You are the Todo App operations agent for Phase V.
+      You monitor deployments, check pod health, analyze logs,
+      and help troubleshoot issues in the Kubernetes cluster.
+      
+      Available resources:
+      - Deployment: todo-backend, todo-frontend
+      - Dapr components: task-pubsub, task-statestore, reminder-cron
+      - Redpanda: message broker for task events
+      
+      Always check pod status and logs before suggesting fixes.
