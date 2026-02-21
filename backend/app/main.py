@@ -52,6 +52,7 @@ CORS_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     "https://the-evolution-of-todo-app-phase-iv.vercel.app",
+    "https://phase5-todo-app.vercel.app",
 ]
 if settings.CORS_ORIGINS:
     for o in settings.CORS_ORIGINS.split(","):

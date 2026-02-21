@@ -2,6 +2,15 @@
 
 A complete, production-ready todo application implementing **all Phase II and Phase III requirements** from the specification documents.
 
+## Live Demo (Vercel)
+
+**Phase 5:** [https://phase5-todo-app.vercel.app](https://phase5-todo-app.vercel.app)
+
+- Frontend deploy: [VERCEL_PHASE5_DEPLOY.md](VERCEL_PHASE5_DEPLOY.md)
+- Backend deploy (Render): [BACKEND_DEPLOY.md](BACKEND_DEPLOY.md) — [Deploy to Render](https://render.com/deploy?repo=https://github.com/waqasvicky10/The-Evolution-Of-Todo-App-phase-V)
+
+---
+
 ## Phase IV Fallback: Docker Compose Deployment
 
 If you encounter memory issues with Minikube/Hyper-V, use Docker Compose for local deployment. This simulates the Kubernetes environment using containers.

@@ -21,7 +21,6 @@ coverage.xml
 .vercel
 node_modules/
 backend/
-frontend/
 phase_i/
 # Exclude huge documentation files
 *.docx

@@ -1,5 +1,6 @@
 ═══════════════════════════════════════════════════════════════
-  VERCEL DEPLOYMENT - CONFIGURATION VALUES
+  VERCEL DEPLOYMENT - Phase 5 Configuration
+  Target URL: https://heckathon-2-phase5.vercel.app
 ═══════════════════════════════════════════════════════════════
 
 📋 Use these exact values when deploying to Vercel:
@@ -9,7 +10,7 @@ PROJECT SETTINGS
 ═══════════════════════════════════════════════════════════════
 
 Project Name:
-todo-app-phase2
+heckathon-2-phase5
 
 Framework Preset:
 Next.js
@@ -27,70 +28,51 @@ Install Command:
 npm install
 
 ═══════════════════════════════════════════════════════════════
-ENVIRONMENT VARIABLES (Add this 1 variable)
+ENVIRONMENT VARIABLES
 ═══════════════════════════════════════════════════════════════
 
-Name (Key):
-NEXT_PUBLIC_API_BASE_URL
+1. API_URL (for Next.js rewrites - server-side)
+   Name: API_URL
+   Value: [YOUR BACKEND URL - e.g. https://your-backend.onrender.com]
+   Environment: ☑ Production ☑ Preview ☑ Development
 
-Value:
-[PASTE YOUR RENDER BACKEND URL HERE]
-
-Example:
-https://todo-api-phase2.onrender.com
-
-Environment:
-☑ Production
-☑ Preview
-☑ Development
+2. NEXT_PUBLIC_API_BASE_URL (optional - leave empty for proxy mode)
+   Name: NEXT_PUBLIC_API_BASE_URL
+   Value: [Empty or same as API_URL]
+   Note: Empty = frontend uses /api/* proxy via Next.js rewrites
 
 ═══════════════════════════════════════════════════════════════
-YOUR BACKEND URL (Get from Render Dashboard)
+YOUR DEPLOYMENT URL
 ═══════════════════════════════════════════════════════════════
 
-To find your backend URL:
-1. Go to: https://dashboard.render.com
-2. Click on "todo-api-phase2" service
-3. Copy the URL at the top (e.g., https://todo-api-phase2.onrender.com)
-4. Paste above in NEXT_PUBLIC_API_BASE_URL
+After deployment, your app will be live at:
+https://heckathon-2-phase5.vercel.app
+
+To get this URL: Set Project Name to "heckathon-2-phase5" in Vercel.
+
+═══════════════════════════════════════════════════════════════
+EXISTING PROJECT - UPDATE PROJECT NAME
+═══════════════════════════════════════════════════════════════
+
+If you already have a Vercel project:
+1. Go to: https://vercel.com/dashboard
+2. Open your project → Settings → General
+3. Change "Project Name" to: heckathon-2-phase5
+4. Save - your URL will become heckathon-2-phase5.vercel.app
 
 ═══════════════════════════════════════════════════════════════
 AFTER DEPLOYMENT
 ═══════════════════════════════════════════════════════════════
 
-1. Copy your Vercel URL (e.g., https://todo-app-phase2.vercel.app)
-
-2. Update backend CORS in Render:
-   - Go to Render Dashboard
-   - Environment → CORS_ORIGINS
-   - Change to your Vercel URL
-   - Save Changes
-
-3. Test your app:
-   - Visit your Vercel URL
-   - Register account
-   - Create tasks
-   - Test all features
+1. Add your backend URL to API_URL in Vercel Environment Variables
+2. Update backend CORS to allow: https://heckathon-2-phase5.vercel.app
+3. Redeploy if you changed env vars
+4. Test: https://heckathon-2-phase5.vercel.app
 
 ═══════════════════════════════════════════════════════════════
 QUICK LINKS
 ═══════════════════════════════════════════════════════════════
 
 Vercel Dashboard: https://vercel.com/dashboard
-Render Dashboard: https://dashboard.render.com
-GitHub Repo: https://github.com/waqasvicky10/The-Evolution-Of-Todo-App
-
-═══════════════════════════════════════════════════════════════
-NOTES
-═══════════════════════════════════════════════════════════════
-
-- Framework preset should auto-detect as Next.js
-- Make sure Root Directory is set to "frontend"
-- Environment variable MUST start with NEXT_PUBLIC_ to be accessible
-- After deployment, you MUST update backend CORS_ORIGINS
-
-═══════════════════════════════════════════════════════════════
-READY TO DEPLOY!
-═══════════════════════════════════════════════════════════════
-
-Follow the step-by-step guide in: VERCEL_DEPLOYMENT.md
+GitHub Repo: https://github.com/waqasvicky10/The-Evolution-Of-Todo-App-phase-V
+Live App: https://heckathon-2-phase5.vercel.app
