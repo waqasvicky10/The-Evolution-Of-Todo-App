@@ -64,7 +64,9 @@ const nextConfig = {
     return config;
   },
   async rewrites() {
-    const backendUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    const vercelBackend = 'https://the-evolution-of-todo-app-phase-iv-rho.vercel.app';
+    const raw = (process.env.API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '').trim().replace(/\s+/g, '');
+    const backendUrl = raw.startsWith('http') ? raw : (process.env.VERCEL ? vercelBackend : 'http://localhost:8000');
     return [
       { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
     ];
