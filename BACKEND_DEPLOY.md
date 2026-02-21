@@ -6,7 +6,7 @@
 
 **Click this button:**
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/waqasvicky10/The-Evolution-Of-Todo-App-phase-V)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/waqasvicky10/The-Evolution-Of-Todo-App)
 
 1. Click the button above
 2. Sign in to Render (or create account with GitHub)
@@ -20,7 +20,7 @@
 
 1. Go to https://dashboard.render.com
 2. **New +** → **Blueprint**
-3. Connect repo: `The-Evolution-Of-Todo-App-phase-V`
+3. Connect repo: `The-Evolution-Of-Todo-App`
 4. Click **Deploy Blueprint**
 5. Copy backend URL when done
 
