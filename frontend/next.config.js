@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
+const BACKEND_URL = 'https://the-evolution-of-todo-app-phase-iv-rho.vercel.app';
+
 const nextConfig = {
   reactStrictMode: true,
+  // Direct backend URL for production - browser calls backend directly (no proxy)
+  env: {
+    NEXT_PUBLIC_API_BASE_URL: process.env.VERCEL ? BACKEND_URL : (process.env.NEXT_PUBLIC_API_BASE_URL || ''),
+  },
   // Performance optimizations for faster dev server
   swcMinify: true,
 
